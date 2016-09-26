@@ -1,4 +1,4 @@
-ds = 1;  %Amount to downsample problem. Use 1/integer.
+ds = 1/8;  %Amount to downsample problem. Use 1/integer.
 useGpu = 1;
 
 %Load psf
@@ -47,7 +47,7 @@ dct_sparse = 0;
 lpf_true = 0;
 window_object = 1;
 add_noise = 0;
-sense_compressively = 1;
+sense_compressively = 0;
 cs_type = 'pepper';
 switch lower(data_type)
     case('measured')
@@ -161,22 +161,20 @@ if bin
 end
 
 if useGpu
-    psfd = gpuArray(single(psfd));
-    H = gpuArray(single(H));
-    H_conj = gpuArray(single(H_conj));
-    obj_r = gpuArray(single(obj_r));
-    W = gpuArray(logical(W));
-    cr = gpuArray(cr);
-    cc = gpuArray(cc);
+    psfd = gpuArray(psfd);
+    H = gpuArray(H);
+    H_conj = gpuArray(H_conj);
+    obj_r = gpuArray(obj_r);
+    W = gpuArray(W);
 end
 %%
 wavelev = 8;
 wavetype = 'db9';
 %[nrows,ncols] = size(im_in);
-tau = 10e-6;
+tau = 5e-5;
 tau2 = tau;
 lambda = tau;
-options.stepsize = 2000;
+options.stepsize = 500;
 options.convTol = 12e-12;
 %options.xsize = [256,256];
 options.maxIter = 10000;
@@ -185,14 +183,13 @@ options.momentum = 'nesterov';
 options.disp_figs = 1;
 options.disp_fig_interval = 10;   %display image this often
 options.xsize = 3*size(psfd);
-options.disp_crop = @(x)gather(crop(abs(x)));
+options.disp_crop = @(x)gather(crop(x;
 options.disp_gamma = 1/2.2;
-options.known_input = 1;
-options.force_real = 1;
+options.known_input = 0;
 if options.known_input
     options.crop = crop;
     filt = fspecial('gaussian',[5,5],.3);
-    options.xin = single(conv2(x_lpf,filt,'same'));
+    options.xin = conv2(x_lpf,filt,'same');
 end
 filt = fspecial('gaussian',[5,5],.2);
 
@@ -216,7 +213,7 @@ maxval = 255;
 %prox_handle = @(x)adaptive_soft_wvlt_2d(crop(x),wavelev,wavetype,.9,minval,maxval,pad);
  
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
-prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
+prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
 amt = .001;
 rad = 1;
 
@@ -285,11 +282,7 @@ end
 %x_init = nspace;
 %x_init = zeros(size(xhat));
 %x_init = zeros(size(pad(psfd)));\
-if useGpu
-    x_init = gpuArray(zeros(size(Atb)));
-else
-    x_init = zeros(size(Atb));
-end
+x_init = Atb*255/max(Atb(:));
 %x_init = x_lpf+randn(size(x_lpf));
 %x_init = 255*rand(size(Atb));
 %x_init = W.*(xhat+.07*rand(size(xhat)).*max(xhat(:)));
