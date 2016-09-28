@@ -1,10 +1,10 @@
-ds = 1;  %Amount to downsample problem. Use 1/integer.
-useGpu = 1;
+ds = 1/2;  %Amount to downsample problem. Use 1/integer.
+useGpu = 0;
 
 %Load psf
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/psf_again.tif'));
-%psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
-psf = single(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
+psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
+%psf = single(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
@@ -17,7 +17,7 @@ pad = @(x)padarray(x,[size(psfd,1),size(psfd,2)],'both');
 nopad = @(x)x;
 psf_z = pad(psfd);
 
-W = pad(ones(size(psfd)));
+W = logical(pad(ones(size(psfd))));
 H = fft2(psf_z);
 H_conj = conj(H);
 
@@ -39,7 +39,7 @@ else
     psf_b = imresize(psfd,1/bin,'box');
     pad_obj = @(x)padarray(x,[size(psf_b,1),size(psf_b,2)],'both');
 end
-A = @(x)crop(ifftshift(ifft2(H.*fft2(x))));
+A = @(x)(crop(ifftshift(ifft2(H.*fft2(x)))));
 data_type = 'simulated';   %use  'measured' to load real image, 'cameraman' to make fake data from cameraman
 im_type = 'cameraman';
 
@@ -65,7 +65,7 @@ switch lower(data_type)
     case('simulated')
         switch lower(im_type)
             case('cameraman')
-                obj = imresize(double(imread('cameraman.tif')),1.5,'box')*255/255;
+                obj = imresize(double(imread('cameraman.tif')),1.5,'box');
             case('deltas')
                 %imsize = [400 400];
                 %ndeltas = 10000;
@@ -128,7 +128,7 @@ end
 if sense_compressively
     switch lower(cs_type)
         case('pepper')
-            inds = randsample(numel(psfd),floor(.8*numel(psfd)));
+            inds = randsample(numel(psfd),floor(0*numel(psfd)));
             WD = ones(size(psfd));
             WD(inds) = 0;
             WD = pad(WD);
@@ -153,7 +153,7 @@ if sense_compressively
             WD(size(psfd,1)+sort(inds),:) = 0;
     end
     
-    obj_r = crop(WD.*pad(obj_r));
+    obj_r = crop(WD.*pad(obj_r));  %Delete things by multiplying by zero
 end
 
 if bin
@@ -179,11 +179,11 @@ lambda = tau;
 options.stepsize = 2000;
 options.convTol = 12e-12;
 %options.xsize = [256,256];
-options.maxIter = 10000;
+options.maxIter = 99;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 10;   %display image this often
+options.disp_fig_interval = 100;   %display image this often
 options.xsize = 3*size(psfd);
 options.disp_crop = @(x)gather(crop(abs(x)));
 options.disp_gamma = 1/2.2;
@@ -192,7 +192,7 @@ options.force_real = 1;
 if options.known_input
     options.crop = crop;
     filt = fspecial('gaussian',[5,5],.3);
-    options.xin = single(conv2(x_lpf,filt,'same'));
+    options.xin = double(conv2(x_lpf,filt,'same'));
 end
 filt = fspecial('gaussian',[5,5],.2);
 
@@ -211,12 +211,12 @@ maxval = 255;
 %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
 %prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
 %nopad = @(x)x;
-%prox_handle = @(x)bound_range(x,minval,maxval,nopad)
+prox_handle = @(x)bound_range(x,minval,maxval,nopad)
 %prox_handle = @(x)soft_wavelet_2d(crop(x),wavelev,wavetype,tau,minval,maxval,pad)
 %prox_handle = @(x)adaptive_soft_wvlt_2d(crop(x),wavelev,wavetype,.9,minval,maxval,pad);
  
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
-prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
+%prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
 amt = .001;
 rad = 1;
 
@@ -262,7 +262,12 @@ nvar = 0;
 %norm_handle = @(x)lambda*norm(reshape(wdec2(x),wave
 if sense_compressively
     Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
-    GradErrHandle = @(x) gradient_from_psf(x,H,H_conj,WD,cr,cc,Atb,obj_r,1/(numel(psfd)^2));
+    inds_l = logical(fftshift(WD));
+    %Ws = double(fftshift(
+    inds_w = find(crop(WD));
+    op = fftshift(pad(obj_r));
+    %obj
+    GradErrHandle = @(x) gradient_from_psf_v2(x,H,H_conj,inds_l,inds_l,Atb,op(inds_l),1/(numel(psfd)^2));
 else
     if ~bin
         Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
@@ -294,6 +299,6 @@ end
 %x_init = 255*rand(size(Atb));
 %x_init = W.*(xhat+.07*rand(size(xhat)).*max(xhat(:)));
 figure(1),clf
+profile on
 [xhat, funvals] = proxMin(GradErrHandle,prox_handle,x_init,obj_r,options);
-
-
+profile viewer
