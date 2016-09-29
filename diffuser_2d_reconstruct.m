@@ -8,8 +8,8 @@ psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NIC
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
-psfc = circshift(psf,[-80,0]);
-psfd = imresize(psfc,ds,'box')*1000/max(psfc(:));  %Normalize and antialias downsample
+psfc = circshift(psf,[0,0]);
+psfd = imresize(psfc,ds,'box')*1/max(psf(:));  %Normalize and antialias downsample
 
 
 
@@ -17,7 +17,7 @@ pad = @(x)padarray(x,[size(psfd,1),size(psfd,2)],'both');
 nopad = @(x)x;
 psf_z = pad(psfd);
 
-W = pad(ones(size(psfd)));
+W = logical(pad(ones(size(psfd))));
 H = fft2(psf_z);
 H_conj = conj(H);
 
@@ -133,7 +133,7 @@ end
 if sense_compressively
     switch lower(cs_type)
         case('pepper')
-            inds = randsample(numel(psfd),floor(.8*numel(psfd)));
+            inds = randsample(numel(psfd),floor(0*numel(psfd)));
             WD = ones(size(psfd));
             WD(inds) = 0;
             WD = pad(WD);
@@ -158,7 +158,7 @@ if sense_compressively
             WD(size(psfd,1)+sort(inds),:) = 0;
     end
     
-    obj_r = crop(WD.*pad(obj_r));
+    obj_r = crop(WD.*pad(obj_r));  %Delete things by multiplying by zero
 end
 
 if bin
@@ -284,7 +284,12 @@ nvar = 0;
 %norm_handle = @(x)lambda*norm(reshape(wdec2(x),wave
 if sense_compressively
     Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
-    GradErrHandle = @(x) gradient_from_psf(x,H,H_conj,WD,cr,cc,Atb,obj_r,1/(numel(psfd)^2));
+    inds_l = logical(fftshift(WD));
+    %Ws = double(fftshift(
+    inds_w = find(crop(WD));
+    op = fftshift(pad(obj_r));
+    %obj
+    GradErrHandle = @(x) gradient_from_psf_v2(x,H,H_conj,inds_l,inds_l,Atb,op(inds_l),1/(numel(psfd)^2));
 else
     if ~bin
         Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
@@ -323,5 +328,4 @@ end
 %x_init = W.*(xhat+.07*rand(size(xhat)).*max(xhat(:)));
 figure(1),clf
 [xhat, funvals] = proxMin(GradErrHandle,prox_handle,x_init,obj_r,options);
-
 
