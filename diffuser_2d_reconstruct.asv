@@ -1,15 +1,15 @@
-ds = 1/8;  %Amount to downsample problem. Use 1/integer.
+ds = 1/2;  %Amount to downsample problem. Use 1/integer.
 useGpu = 1;
-
+useDouble = 1;
 %Load psf
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/psf_again.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
-psf = single(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
+psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
 psfc = circshift(psf,[0,0]);
-psfd = imresize(psfc,ds,'box')*1/max(psf(:));  %Normalize and antialias downsample
+psfd = imresize(psfc,ds,'box')*1000/max(psfc(:));  %Normalize and antialias downsample
 
 
 
@@ -41,13 +41,13 @@ else
 end
 A = @(x)crop(ifftshift(ifft2(H.*fft2(x))));
 data_type = 'simulated';   %use  'measured' to load real image, 'cameraman' to make fake data from cameraman
-im_type = 'cameraman';
+im_type = 'peppers';
 
 dct_sparse = 0;
 lpf_true = 0;
 window_object = 1;
 add_noise = 0;
-sense_compressively = 0;
+sense_compressively = 1;
 cs_type = 'pepper';
 switch lower(data_type)
     case('measured')
@@ -65,7 +65,7 @@ switch lower(data_type)
     case('simulated')
         switch lower(im_type)
             case('cameraman')
-                obj = imresize(double(imread('cameraman.tif')),1.5,'box')*255/255;
+                obj = imresize(double(imread('cameraman.tif')),2.5*2*ds,'bicubic')*255/255;
             case('deltas')
                 %imsize = [400 400];
                 %ndeltas = 10000;
@@ -78,6 +78,11 @@ switch lower(data_type)
                 obj = delta([90,120],3*size(psfd))*255;
             case('circ')
                 obj = imresize(double(imread('circles.png')),2);
+            case('peppers')
+                objin = imread('peppers.png');
+                obj = double(objin(:,:,1));
+                obj= imresize(obj,2,'bicubic');
+                
             case('flat')
                 obj = ones(3*size(psfd));
             case('usaf')
@@ -134,12 +139,12 @@ if sense_compressively
             WD = pad(WD);
         case('tile')
             
-            modr = mod(1:size(psfd,1),22);
+            modr = mod(1:size(psfd,1),220/2);
             lr = 1:size(psfd,1);
-            modc = mod(1:size(psfd,2),30);
+            modc = mod(1:size(psfd,2),300/2);
             lc = 1:size(psfd,2);
-            rsub = double(modr<18);
-            csub = double(modc<24);
+            rsub = double(modr<160/2);
+            csub = double(modc<210/2);
             WD = pad(rsub'*csub);
         case('random_lines')
             inds = randsample(size(psfd,1),floor(.7*size(psfd,1)));
@@ -161,35 +166,54 @@ if bin
 end
 
 if useGpu
-    psfd = gpuArray(psfd);
-    H = gpuArray(H);
-    H_conj = gpuArray(H_conj);
-    obj_r = gpuArray(obj_r);
-    W = gpuArray(W);
+    if ~useDouble
+        psfd = gpuArray(single(psfd));
+        H = gpuArray(single(H));
+        H_conj = gpuArray(single(H_conj));
+        obj_r = gpuArray(single(obj_r));
+    else
+        psfd = gpuArray(double(psfd));
+        H = gpuArray(double(H));
+        H_conj = gpuArray(double(H_conj));
+        obj_r = gpuArray(double(obj_r));
+    end
+    W = gpuArray(logical(W));
+    cr = gpuArray(cr);
+    cc = gpuArray(cc);
 end
+
 %%
 wavelev = 8;
 wavetype = 'db9';
 %[nrows,ncols] = size(im_in);
-tau = 5e-5;
+tau = e-6;
 tau2 = tau;
 lambda = tau;
-options.stepsize = 500;
+options.stepsize = .0017;
 options.convTol = 12e-12;
 %options.xsize = [256,256];
-options.maxIter = 10000;
+options.maxIter = 23000;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 10;   %display image this often
+options.disp_fig_interval = 200;   %display image this often
 options.xsize = 3*size(psfd);
-options.disp_crop = @(x)gather(crop(x;
+options.disp_crop = @(x)gather(crop(abs(x)));
 options.disp_gamma = 1/2.2;
-options.known_input = 0;
+options.known_input = 1;
+options.force_real = 1;
 if options.known_input
     options.crop = crop;
     filt = fspecial('gaussian',[5,5],.3);
-    options.xin = conv2(x_lpf,filt,'same');
+    if useGpu
+        if ~useDouble
+            options.xin = single(conv2(x_lpf,filt,'same'));
+        else
+            options.xin = conv2(x_lpf,filt,'same');
+        end
+    else
+        options.xin = double(conv2(x_lpf,filt,'same'));
+    end
 end
 filt = fspecial('gaussian',[5,5],.2);
 
@@ -204,8 +228,8 @@ filt = fspecial('gaussian',[5,5],.2);
 niters = 8;
 minval = 0;
 maxval = 255;
-%prox_handle = @(x)soft_dct2(crop(x),tau,minval,maxval,ones(size(W)),pad);
-%prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
+%prox_handle = @(x)soft_dct2(crop(real(x)),tau,minval,maxval,ones(size(W)),pad);
+%prox_handle = @(x)bound_range(crop(abs(x)),minval,maxval,pad);
 %prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
 %nopad = @(x)x;
 %prox_handle = @(x)bound_range(x,minval,maxval,nopad)
@@ -213,7 +237,7 @@ maxval = 255;
 %prox_handle = @(x)adaptive_soft_wvlt_2d(crop(x),wavelev,wavetype,.9,minval,maxval,pad);
  
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
-prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
+prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
 amt = .001;
 rad = 1;
 
@@ -282,7 +306,17 @@ end
 %x_init = nspace;
 %x_init = zeros(size(xhat));
 %x_init = zeros(size(pad(psfd)));\
-x_init = Atb*255/max(Atb(:));
+if useGpu
+    if ~useDouble
+        x_init = gpuArray(single(zeros(size(Atb))));
+    elseif useDouble
+        x_init = gpuArray(zeros(size(Atb)));
+        %x_init = xhat;
+    end
+    %x_init = xhat;
+else
+    x_init = zeros(size(Atb));
+end
 %x_init = x_lpf+randn(size(x_lpf));
 %x_init = 255*rand(size(Atb));
 %x_init = W.*(xhat+.07*rand(size(xhat)).*max(xhat(:)));
