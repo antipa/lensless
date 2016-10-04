@@ -13,4 +13,4 @@ b_u = ifftshift(ifft2(H.*fft2(x)));   %crop(b_u) is same as Ax
 AtAx = ifftshift(ifft2(H_conj.*fft2(W.*b_u)));
 g = (AtAx-Atb)*ds;
 b_un = W.*b_u;
-f = norm(b_un(cr,cc)-obj_r,'fro')^2;
+f = norm(b_un(cr,cc)-obj_r,'fro')^2;         

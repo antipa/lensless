@@ -1,4 +1,4 @@
-ds = 1/2;  %Amount to downsample problem. Use 1/integer.
+ds = 1/8;  %Amount to downsample problem. Use 1/integer.
 useGpu = 0;
 
 %Load psf
@@ -9,8 +9,8 @@ psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_fl
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
 psfc = circshift(psf,[0,0]);
-psfd = imresize(psfc,ds,'box')*1/max(psf(:));  %Normalize and antialias downsample
-
+psfd = imresize(psfc,ds,'box');  %Normalize and antialias downsample
+psfd = psfd/norm(psfd(:));
 
 
 pad = @(x)padarray(x,[size(psfd,1),size(psfd,2)],'both');
@@ -21,7 +21,7 @@ W = logical(pad(ones(size(psfd))));
 H = fft2(psf_z);
 H_conj = conj(H);
 
-bin = 0;
+bin = 3;
 ii = find(W);
 [r,c] = ind2sub(size(W),ii);
 cr = min(r):max(r);
@@ -45,9 +45,10 @@ im_type = 'cameraman';
 
 dct_sparse = 0;
 lpf_true = 0;
-window_object = 1;
+window_object = 0;
 add_noise = 0;
-sense_compressively = 1;
+precondition = 0;
+sense_compressively = 0;
 cs_type = 'pepper';
 switch lower(data_type)
     case('measured')
@@ -158,6 +159,7 @@ end
 
 if bin
     obj_r = imresize(obj_r,1/bin,'box');
+    
 end
 
 if useGpu
@@ -176,26 +178,28 @@ wavetype = 'db9';
 tau = 10e-6;
 tau2 = tau;
 lambda = tau;
-options.stepsize = 2000;
-options.convTol = 12e-12;
+options.stepsize = 1500;
+options.convTol = 12e-5;
 %options.xsize = [256,256];
-options.maxIter = 99;
+options.maxIter = 10000;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 100;   %display image this often
+options.disp_fig_interval = 20;   %display image this often
 options.xsize = 3*size(psfd);
-options.disp_crop = @(x)gather(crop(abs(x)));
+%options.disp_crop = @(x)(crop(abs(x)));
+options.disp_crop = @(x)x;
 options.disp_gamma = 1/2.2;
-options.known_input = 1;
-options.force_real = 1;
+options.known_input = 0;
+options.force_real = 0;
 if options.known_input
     options.crop = crop;
     filt = fspecial('gaussian',[5,5],.3);
     options.xin = double(conv2(x_lpf,filt,'same'));
 end
 filt = fspecial('gaussian',[5,5],.2);
-
+pmat = load('../w_8.mat');
+pmat.w = pmat.w./max(pmat.w(:));
 %%prox_handle = @(x)max(soft(x,.000001),0);
 %prox_handle = @(x)max(W.*x,0);
 %prox_handle = @(x)x;
@@ -206,23 +210,27 @@ filt = fspecial('gaussian',[5,5],.2);
 
 niters = 8;
 minval = 0;
-maxval = 255;
+maxval = inf;
 %prox_handle = @(x)soft_dct2(crop(x),tau,minval,maxval,ones(size(W)),pad);
+%nopad = @(x)x;
+%prox_handle = @(x)soft_dct2(x,tau,minval,maxval,ones(size(W)),nopad);
 %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
 %prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
-%nopad = @(x)x;
-prox_handle = @(x)bound_range(x,minval,maxval,nopad)
-%prox_handle = @(x)soft_wavelet_2d(crop(x),wavelev,wavetype,tau,minval,maxval,pad)
-%prox_handle = @(x)adaptive_soft_wvlt_2d(crop(x),wavelev,wavetype,.9,minval,maxval,pad);
- 
+nopad = @(x)x;
+deweight = @(x)x./pmat.w.*(pmat.w>1e-4);
+%prox_handle = @(x)bound_range(x,minval,maxval,nopad)
+%prox_handle = @(x)soft_wavelet_2d(x,wavelev,wavetype,tau,minval,maxval,nopad)
+prox_handle = @(x)adaptive_soft_wvlt_2d(x,wavelev,wavetype,.6,minval,maxval,nopad);
+
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
 %prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
+%prox_handle = @(x)tv_2d(x.*pmat.w,tau,niters,minval,maxval,deweight);
 amt = .001;
 rad = 1;
 
 %prox_handle = @(x)sharpen_2d(crop(x),rad,amt,minval,maxval,pad);
 %prox_handle = @(x)tv_dct_2d(crop(x),tau,tau2,6,minval,maxval,pad);
-nopad = @(x)x;
+
 %prox_handle = @(x)tv_dct_2d(crop(x),tau,tau2,6,minval,maxval,pad)
 %prox_handle = @(x)soft_2d(x,tau,minval,maxval);
 %prox_handle = @(x)x;
@@ -270,9 +278,16 @@ if sense_compressively
     GradErrHandle = @(x) gradient_from_psf_v2(x,H,H_conj,inds_l,inds_l,Atb,op(inds_l),1/(numel(psfd)^2));
 else
     if ~bin
-        Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
+        if precondition
+            
+            Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))))./pmat.w;
         
-        GradErrHandle = @(x) gradient_from_psf(x,H,H_conj,W,cr,cc,Atb,obj_r,1/(numel(psfd)^2));
+            GradErrHandle = @(x) gradient_from_psf_precondition(x,H,H_conj,W,cr,cc,Atb,obj_r,1/(numel(psfd)^2),pmat.w);
+        else
+            Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
+        
+            GradErrHandle = @(x) gradient_from_psf(x,H,H_conj,W,cr,cc,Atb,obj_r,1/(numel(psfd)^2));
+        end
     else
         filt = ones(bin)/bin^2;
         Atb = ifftshift(ifft2(H_conj.*fft2(pad(imresize(obj_r,bin,'nearest')))));
@@ -294,11 +309,12 @@ if useGpu
     x_init = gpuArray(zeros(size(Atb)));
 else
     x_init = zeros(size(Atb));
+    %x_init = xhat;
 end
 %x_init = x_lpf+randn(size(x_lpf));
 %x_init = 255*rand(size(Atb));
 %x_init = W.*(xhat+.07*rand(size(xhat)).*max(xhat(:)));
 figure(1),clf
-profile on
+
 [xhat, funvals] = proxMin(GradErrHandle,prox_handle,x_init,obj_r,options);
-profile viewer
+
