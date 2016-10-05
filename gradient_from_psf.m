@@ -11,6 +11,6 @@ function [f, g] = gradient_from_psf(x,H,H_conj,W,cr,cc,Atb,obj_r,ds)
 
 b_u = ifftshift(ifft2(H.*fft2(x)));   %crop(b_u) is same as Ax
 AtAx = ifftshift(ifft2(H_conj.*fft2(W.*b_u)));
-g = (AtAx-Atb)*ds;
-b_un = W.*b_u;
+g = real(AtAx-Atb)*ds;
+b_un = real(W.*b_u);
 f = norm(b_un(cr,cc)-obj_r,'fro')^2;         
