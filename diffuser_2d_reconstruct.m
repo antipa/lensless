@@ -1,19 +1,27 @@
-ds = 1/8;  %Amount to downsample problem. Use 1/integer.
-useGpu = 1;
+ds = 1/4;  %Amount to downsample problem. Use 1/integer.
+useGpu = 0;
 useDouble = 1;
+bin = 0;
 %Load psf
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/psf_again.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
-psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
-%psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
+%psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
+psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
 psfc = circshift(psf,[0,0]);
 psfd = imresize(psfc,ds,'box');  %Normalize and antialias downsample
+if bin
+    filt = ones(bin)/bin^2;
+    psf_forward = psfd/norm(psfd(:));
+    %psfd = imfilter(psfd,filt);
+else
+    psf_forward = psfd/norm(psfd(:));
+end
 psfd = psfd/norm(psfd(:));
 
 
-pad = @(x)padarray(x,[size(psfd,1),size(psfd,2)],'both');
+pad = @(x)padarray(x,[size(psfd,1)/2,size(psfd,2)/2],'both');
 nopad = @(x)x;
 psf_z = pad(psfd);
 
@@ -21,31 +29,20 @@ W = logical(pad(ones(size(psfd))));
 H = fft2(psf_z);
 H_conj = conj(H);
 
-bin = 3;
+
 ii = find(W);
 [r,c] = ind2sub(size(W),ii);
 cr = min(r):max(r);
 cc = min(c):max(c);
 crop = @(x)x(cr,cc);
-if ~bin
-    crop_obj = crop;
-else
-    W_obj = imresize(W,1/bin,'box');
-    ii = find(W_obj);
-    [r,c] = ind2sub(size(W_obj),ii);
-    cr = min(r):max(r);
-    cc = min(c):max(c);
-    crop_obj = @(x)x(cr,cc);
-    psf_b = imresize(psfd,1/bin,'box');
-    pad_obj = @(x)padarray(x,[size(psf_b,1),size(psf_b,2)],'both');
-end
-A = @(x)crop(ifftshift(ifft2(H.*fft2(x))));
+
+A = @(x)crop(ifftshift(ifft2(fft2(pad(psf_forward)).*fft2(x))));
 data_type = 'measured';   %use  'measured' to load real image, 'cameraman' to make fake data from cameraman
-im_type = 'peppers';
+im_type = 'cameraman';
 
 dct_sparse = 0;
 lpf_true = 0;
-window_object = 0;
+window_object = 1;
 add_noise = 0;
 precondition = 0;
 sense_compressively = 0;
@@ -53,7 +50,7 @@ cs_type = 'pepper';
 switch lower(data_type)
     case('measured')
         
-        obj = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\baffle_hand.tif'));
+        obj = double(imread('/Users/nick.antipa/Dropbox/Light fields without lenslets NICK/data/diffuser_flatcam/Baffle/baffle_hand.tif'));
         %obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp110.tif'));
         %obj3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp120.tif'));
         %obj4 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp130.tif'));
@@ -66,7 +63,7 @@ switch lower(data_type)
     case('simulated')
         switch lower(im_type)
             case('cameraman')
-                obj = imresize(double(imread('cameraman.tif')),2.5*2*ds,'bicubic')*255/255;
+                obj = imresize(double(imread('cameraman.tif')),2.5*4*ds,'bicubic')*255/255;
             case('deltas')
                 %imsize = [400 400];
                 %ndeltas = 10000;
@@ -97,7 +94,8 @@ switch lower(data_type)
         if mod(size(obj,2),2)
             obj = cat(2,zeros(size(obj,1),1),obj);
         end
-        x_in = padarray(obj,[size(psfd,1)*3/2-(size(obj,1)/2),size(psfd,2)*3/2-(size(obj,2)/2)],'both');
+        %x_in = padarray(obj,[size(psfd,1)*3/2-(size(obj,1)/2),size(psfd,2)*3/2-(size(obj,2)/2)],'both');
+        x_in = imresize(pad(obj),size(H));
         if lpf_true==1
             lpf = (abs(H)<.01*max(abs(H(:))));
             x_lpf= (ifft2(fft2(x_in).*(1-lpf)));
@@ -162,10 +160,7 @@ if sense_compressively
     obj_r = crop(WD.*pad(obj_r));  %Delete things by multiplying by zero
 end
 
-if bin
-    obj_r = imresize(obj_r,1/bin,'box');
-    
-end
+
 
 if useGpu
     if ~useDouble
@@ -183,7 +178,7 @@ if useGpu
     cr = gpuArray(cr);
     cc = gpuArray(cc);
 end
-obj_r = obj_r/max(obj_r(:))*7.83e8;
+%obj_r = obj_r/max(obj_r(:))*7.83e8;
 
 %%
 wavelev = 8;
@@ -192,15 +187,15 @@ wavetype = 'db9';
 tau = 7e-7;
 tau2 = tau;
 lambda = tau;
-options.stepsize = 1500;
+options.stepsize = 15000;
 options.convTol = 12e-5;
 %options.xsize = [256,256];
-options.maxIter = 10000;
+options.maxIter = 3000;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 20;   %display image this often
-options.xsize = 3*size(psfd);
+options.disp_fig_interval = 50;   %display image this often
+options.xsize = size(pad(psfd));
 %options.disp_crop = @(x)(crop(abs(x)));
 options.disp_crop = @(x)x;
 options.disp_gamma = 1/2.2;
@@ -239,9 +234,9 @@ maxval = inf;
 %prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
 nopad = @(x)x;
 deweight = @(x)x./pmat.w.*(pmat.w>1e-4);
-%prox_handle = @(x)bound_range(x,minval,maxval,nopad)
+prox_handle = @(x)bound_range(crop(x),minval,maxval,pad)
 %prox_handle = @(x)soft_wavelet_2d(x,wavelev,wavetype,tau,minval,maxval,nopad)
-prox_handle = @(x)adaptive_soft_wvlt_2d(x,wavelev,wavetype,.6,minval,maxval,nopad);
+%prox_handle = @(x)adaptive_soft_wvlt_2d(x,wavelev,wavetype,.6,minval,maxval,nopad);
 
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
 %prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
@@ -311,8 +306,8 @@ else
         end
     else
         filt = ones(bin)/bin^2;
-        Atb = ifftshift(ifft2(H_conj.*fft2(pad(imresize(obj_r,bin,'nearest')))));
-        GradErrHandle = @(x) gradient_from_psf_bin(x,H,H_conj,W_obj,W,crop_obj,Atb,obj_r,1/(numel(psfd)^2),filt,1/bin);
+        Atb = imresize(ifftshift(ifft2(H_conj.*fft2(pad(obj_r)))),1/bin,'box');
+        GradErrHandle = @(x) gradient_from_psf_bin(x,H,H_conj,W,crop,Atb,obj_r,1/(numel(psf_forward)^2),bin);
     end
 end
 
