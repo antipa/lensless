@@ -1,4 +1,4 @@
-function [out, norm_out,varargout] = soft_wavelet_2d(x,wavelev,wavetype,pct_nz,minval,maxval,pad)
+function [out, norm_out,varargout] = adaptive_soft_wvlt_2d(x,wavelev,wavetype,pct_nz,minval,maxval,pad)
 %Inputs:
 %x: variable
 %wavelev: wavelet level for wavedec

@@ -1,12 +1,17 @@
-ds = 1/4;  %Amount to downsample problem. Use 1/integer.
+ds = 1/8;  %Amount to downsample problem. Use 1/integer.
 useGpu = 0;
 useDouble = 1;
 bin = 0;
+patternin = load('../pattern_noise_flea3.mat');
+fim = patternin.fim;
 %Load psf
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/psf_again.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
 %psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
-psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
+psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
+%psf2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
+%psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
+%psf = psf.*fim;
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
 psfc = circshift(psf,[0,0]);
@@ -42,7 +47,7 @@ im_type = 'cameraman';
 
 dct_sparse = 0;
 lpf_true = 0;
-window_object = 1;
+window_object = 0;
 add_noise = 0;
 precondition = 0;
 sense_compressively = 0;
@@ -50,7 +55,15 @@ cs_type = 'pepper';
 switch lower(data_type)
     case('measured')
         
-        obj = double(imread('/Users/nick.antipa/Dropbox/Light fields without lenslets NICK/data/diffuser_flatcam/Baffle/baffle_hand.tif'));
+        %obj = double(imread('/Users/nick.antipa/Dropbox/Light fields without lenslets NICK/data/diffuser_flatcam/Baffle/baffle_hand.tif'));
+        %obj = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/nick_face_close_diffcam.tif'));
+        obj = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor1.tif'));
+        obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor2.tif'));
+        obj3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor3.tif'));
+        obj4 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor4.tif'));
+        obj5 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor5.tif'));
+        %obj = mean(cat(3,obj,obj2,obj3,obj4,obj5),3);
+        %obj = double(imread('/Users/nick.antipa/Desktop/grace_diffcam.tif'));
         %obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp110.tif'));
         %obj3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp120.tif'));
         %obj4 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp130.tif'));
@@ -63,7 +76,7 @@ switch lower(data_type)
     case('simulated')
         switch lower(im_type)
             case('cameraman')
-                obj = imresize(double(imread('cameraman.tif')),2.5*4*ds,'bicubic')*255/255;
+                obj = imresize(double(imread('cameraman.tif')),ds*10,'bicubic');
             case('deltas')
                 %imsize = [400 400];
                 %ndeltas = 10000;
@@ -94,8 +107,9 @@ switch lower(data_type)
         if mod(size(obj,2),2)
             obj = cat(2,zeros(size(obj,1),1),obj);
         end
-        %x_in = padarray(obj,[size(psfd,1)*3/2-(size(obj,1)/2),size(psfd,2)*3/2-(size(obj,2)/2)],'both');
-        x_in = imresize(pad(obj),size(H));
+        obj_c = obj(1:min(size(obj,1),size(pad(psfd),1)),1:min(size(obj,2),size(pad(psfd),2)));
+        x_in = padarray(obj_c,[size(H,1)/2-(size(obj_c,1)/2),size(H,2)/2-(size(obj_c,2)/2)],'both');
+        %x_in = imresize(pad(obj),size(H));
         if lpf_true==1
             lpf = (abs(H)<.01*max(abs(H(:))));
             x_lpf= (ifft2(fft2(x_in).*(1-lpf)));
@@ -119,7 +133,11 @@ switch lower(data_type)
         %x_lpf= (ifft2(fft2(x_in).*(1-lpf)));
         sig_n = .05e4;
         if add_noise
-            obj_r = A(x_lpf)+sig_n*rand(size(psfd));
+            obj_r = A(x_lpf);%+sig_n*rand(size(psfd));
+            %obj_resize = imresize(obj_r,size(psf)).*fim;
+            %obj_r = imresize(obj_resize,size(obj_r));
+            omax = max(obj_r(:));
+            obj_r = double(uint8(obj_r/omax*255))*omax;
         else
             obj_r = A(x_lpf);
         end
@@ -132,7 +150,7 @@ end
 if sense_compressively
     switch lower(cs_type)
         case('pepper')
-            inds = randsample(numel(psfd),floor(0*numel(psfd)));
+            inds = randsample(numel(psfd),floor(.8*numel(psfd)));
             WD = ones(size(psfd));
             WD(inds) = 0;
             WD = pad(WD);
@@ -179,23 +197,23 @@ if useGpu
     cc = gpuArray(cc);
 end
 %obj_r = obj_r/max(obj_r(:))*7.83e8;
-
+%obj_r = obj_r.*fim(1:size(obj_r,1),1:size(obj_r,2));
 %%
 wavelev = 8;
-wavetype = 'db9';
+wavetype = 'haar';
 %[nrows,ncols] = size(im_in);
-tau = 7e-7;
-tau2 = tau;
+tau = 1e-4 ;
+tau2 = 1e-5;
 lambda = tau;
-options.stepsize = 15000;
-options.convTol = 12e-5;
-%options.xsize = [256,256];
-options.maxIter = 3000;
+    options.stepsize = 100000;
+options.convTol = 2.1e5;
+%options.xsize = [256,256]; 
+options.maxIter = 1500;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 50;   %display image this often
-options.xsize = size(pad(psfd));
+options.disp_fig_interval = 20;   %display image this often
+options.xsize = size(pad(psfd))/max(bin,1);
 %options.disp_crop = @(x)(crop(abs(x)));
 options.disp_crop = @(x)x;
 options.disp_gamma = 1/2.2;
@@ -233,19 +251,26 @@ maxval = inf;
 %prox_handle = @(x)soft_dct2(x,tau,minval,maxval,ones(size(W)),nopad);
 %prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
 nopad = @(x)x;
-deweight = @(x)x./pmat.w.*(pmat.w>1e-4);
-prox_handle = @(x)bound_range(crop(x),minval,maxval,pad)
-%prox_handle = @(x)soft_wavelet_2d(x,wavelev,wavetype,tau,minval,maxval,nopad)
-%prox_handle = @(x)adaptive_soft_wvlt_2d(x,wavelev,wavetype,.6,minval,maxval,nopad);
+
+%prox_handle = @(x)bound_range(crop(x),minval,maxval,pad)
+w1 = max(window(@hanning,size(pad(psfd),1)),.1);
+w2 = max(window(@hanning,size(pad(psfd),2)),.1);
+W_real = w1*w2';
+W_fourier = fftshift(w1*w2');
+deweight = @(x)x./W_real.*(W_real>1e-4);
+%prox_handle = @(x)soft_fourier_weighting(x,W_fourier,tau,0,maxval);
+%prox_handle = @(x)soft_wavelet_2d(W_real.*x,wavelev,wavetype,tau,minval,maxval,deweight)
+pct_nz = .9;
+prox_handle = @(x)adaptive_soft_wvlt_2d((x),wavelev,wavetype,pct_nz,minval,maxval,nopad);
 
 %prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
-%prox_handle = @(x)tv_2d(crop(real(x)),tau,niters,minval,maxval,pad);
+%prox_handle = @(x)tv_2d((x),tau,niters,minval,maxval,nopad);
 %prox_handle = @(x)tv_2d(x.*pmat.w,tau,niters,minval,maxval,deweight);
 amt = .001;
 rad = 1;
 
 %prox_handle = @(x)sharpen_2d(crop(x),rad,amt,minval,maxval,pad);
-%prox_handle = @(x)tv_dct_2d(crop(x),tau,tau2,6,minval,maxval,pad);
+%prox_handle = @(x)tv_dct_2d((x),tau,tau2,6,minval,maxval,nopad);
 
 %prox_handle = @(x)tv_dct_2d(crop(x),tau,tau2,6,minval,maxval,pad)
 %prox_handle = @(x)soft_2d(x,tau,minval,maxval);
@@ -296,9 +321,9 @@ else
     if ~bin
         if precondition
             
-            Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))))./pmat.w;
+            Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))))./W_real;
         
-            GradErrHandle = @(x) gradient_from_psf_precondition(x,H,H_conj,W,cr,cc,Atb,obj_r,1/(numel(psfd)^2),pmat.w);
+            GradErrHandle = @(x) gradient_from_psf_precondition(x,H,H_conj,W,cr,cc,Atb,obj_r,1/(numel(psfd)^2),W_real);
         else
             Atb = ifftshift(ifft2(H_conj.*fft2(pad(obj_r))));
         
@@ -332,6 +357,7 @@ if useGpu
 else
     x_init = zeros(size(Atb));
     %x_init = xhat;
+    %x_init = Atb;
 end
 %x_init = x_lpf+randn(size(x_lpf));
 %x_init = 255*rand(size(Atb));
@@ -340,3 +366,14 @@ figure(1),clf
 
 [xhat, funvals] = proxMin(GradErrHandle,prox_handle,x_init,obj_r,options);
 
+
+
+%% Debias
+[~,~,tau_debias] = adaptive_soft_wvlt_2d(xhat,wavelev,wavetype,pct_nz,minval,maxval,nopad);
+[C,S] = wavedec2(xhat,wavelev,wavetype);
+C_soft = soft(C,tau_debias);
+zvec = C_soft==0;
+options.maxIter = 3000;
+options.convTol = 1e3;
+debias_prox_handle = @(x)wavezero(x,wavelev,wavetype,zvec,minval,maxval,nopad);
+[xhat_debias, funvals_debias] = proxMin(GradErrHandle,debias_prox_handle,xhat,obj_r,options);

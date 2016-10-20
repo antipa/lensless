@@ -10,7 +10,7 @@ function [f, g] = gradient_from_psf_bin(x,H,H_conj,W,crop_obj,Atb,obj_r,ds,upsam
 %ds: relative pixel size after downsampling (1/downsample number)
 
 %xup = upsample2d(x,upsamp,1,1);
-xup = imresize(x,upsamp,'nearest');
+xup = imresize(x,size(H),'nearest');
 b_u = ifftshift(ifft2(H.*fft2(xup)));   %crop(b_u) is same as Ax
 AtAx = imresize(ifftshift(ifft2(H_conj.*fft2(W.*b_u))),1/upsamp,'box');
 g = (AtAx-Atb)*ds;
