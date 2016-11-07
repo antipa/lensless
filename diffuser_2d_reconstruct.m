@@ -1,20 +1,20 @@
-ds = 1/8;  %Amount to downsample problem. Use 1/integer.
+ds = 1/5;  %Amount to downsample problem. Use 1/integer.
 useGpu = 0;
 useDouble = 1;
 bin = 0;
-patternin = load('../pattern_noise_flea3.mat');
-fim = patternin.fim;
+%patternin = load('../pattern_noise_flea3.mat');
+%fim = patternin.fim;
 %Load psf
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/psf_again.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
 %psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
-psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Baffle/psf_16bit_baffle.tif'));
+psf = double(imread('psf_16bit_baffle.tif'));
 %psf2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp16.tif'));
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = psf.*fim;
 %psf3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/psf_hdr/psf_box_exp24.tif'));
 %psf = mean(cat(3,psf,psf2),3);
-psfc = circshift(psf,[0,0]);
+psfc = circshift(psf,[0,0]);    %Align PSF if necessary
 psfd = imresize(psfc,ds,'box');  %Normalize and antialias downsample
 if bin
     filt = ones(bin)/bin^2;
@@ -23,14 +23,14 @@ if bin
 else
     psf_forward = psfd/norm(psfd(:));
 end
-psfd = psfd/norm(psfd(:));
+psfd = psfd/norm(psfd(:));    %Make downsampled and normalized PSF. This is what's used to solve.
 
 
 pad = @(x)padarray(x,[size(psfd,1)/2,size(psfd,2)/2],'both');
 nopad = @(x)x;
-psf_z = pad(psfd);
+psf_z = pad(psfd);   %Make zero-padded PSF
 
-W = logical(pad(ones(size(psfd))));
+W = logical(pad(ones(size(psfd))));  %2D rect function
 H = fft2(psf_z);
 H_conj = conj(H);
 
@@ -41,27 +41,28 @@ cr = min(r):max(r);
 cc = min(c):max(c);
 crop = @(x)x(cr,cc);
 
-A = @(x)crop(ifftshift(ifft2(fft2(pad(psf_forward)).*fft2(x))));
-data_type = 'measured';   %use  'measured' to load real image, 'cameraman' to make fake data from cameraman
+A = @(x)crop(ifftshift(ifft2(fft2(pad(psf_forward)).*fft2(x))));  %Handle for forward model
+data_type = 'simulated';   %use  'measured' to load real image, 'cameraman' to make fake data from cameraman
 im_type = 'cameraman';
 
-dct_sparse = 0;
-lpf_true = 0;
-window_object = 0;
-add_noise = 0;
-precondition = 0;
-sense_compressively = 0;
-cs_type = 'pepper';
+dct_sparse = 0;  %Make input image sparse before passing through A
+lpf_true = 0;   %Low pass filter input image.
+window_object = 1;   %This zeros the input object outside the sensor support. Set to 1 for CS
+add_noise = 0;   %Sensor noise
+precondition = 0;  %Don't use this
+sense_compressively = 1;   %Set to 1 if you want to erase pixels for compressive sensing.
+cs_type = 'pepper';   %Type of erasures. Can use 'pepper' to remove randomly, 'tile' to make a tiled focal plane 'random_lines' deltes horizontal lines at random
+
 switch lower(data_type)
     case('measured')
         
         %obj = double(imread('/Users/nick.antipa/Dropbox/Light fields without lenslets NICK/data/diffuser_flatcam/Baffle/baffle_hand.tif'));
         %obj = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/nick_face_close_diffcam.tif'));
-        obj = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor1.tif'));
-        obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor2.tif'));
-        obj3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor3.tif'));
-        obj4 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor4.tif'));
-        obj5 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor5.tif'));
+        obj = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/ee118.tif'));
+        %obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor2.tif'));
+        %obj3 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor3.tif'));
+        %obj4 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor4.tif'));
+        %obj5 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/joker_ace_thor_medium/joker_ace_thor5.tif'));
         %obj = mean(cat(3,obj,obj2,obj3,obj4,obj5),3);
         %obj = double(imread('/Users/nick.antipa/Desktop/grace_diffcam.tif'));
         %obj2 = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Box/scene_hdr/box_scene_exp110.tif'));
@@ -133,7 +134,7 @@ switch lower(data_type)
         %x_lpf= (ifft2(fft2(x_in).*(1-lpf)));
         sig_n = .05e4;
         if add_noise
-            obj_r = A(x_lpf);%+sig_n*rand(size(psfd));
+            obj_r = A(x_lpf)+sig_n*rand(size(psfd));
             %obj_resize = imresize(obj_r,size(psf)).*fim;
             %obj_r = imresize(obj_resize,size(obj_r));
             omax = max(obj_r(:));
@@ -149,6 +150,10 @@ end
 
 if sense_compressively
     switch lower(cs_type)
+        case('bayer_blue')
+            WD = zeros(size(psfd));
+            WD(1:2:end,1:2:end) = 1;
+    
         case('pepper')
             inds = randsample(numel(psfd),floor(.8*numel(psfd)));
             WD = ones(size(psfd));
@@ -199,23 +204,23 @@ end
 %obj_r = obj_r/max(obj_r(:))*7.83e8;
 %obj_r = obj_r.*fim(1:size(obj_r,1),1:size(obj_r,2));
 %%
-wavelev = 8;
+wavelev = 6;
 wavetype = 'haar';
 %[nrows,ncols] = size(im_in);
-tau = 1e-4 ;
+tau = 1e-4;
 tau2 = 1e-5;
 lambda = tau;
-    options.stepsize = 100000;
-options.convTol = 2.1e5;
+    options.stepsize = 650000;
+options.convTol = 2.1e-5;
 %options.xsize = [256,256]; 
-options.maxIter = 1500;
+options.maxIter = 6000;
 options.residTol = .2;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 20;   %display image this often
+options.disp_fig_interval = 100;   %display image this often
 options.xsize = size(pad(psfd))/max(bin,1);
 %options.disp_crop = @(x)(crop(abs(x)));
-options.disp_crop = @(x)x;
+options.disp_crop = crop;
 options.disp_gamma = 1/2.2;
 options.known_input = 0;
 options.force_real = 0;
@@ -249,10 +254,10 @@ maxval = inf;
 %prox_handle = @(x)soft_dct2(crop(real(x)),tau,minval,maxval,ones(size(W)),pad);
 %nopad = @(x)x;
 %prox_handle = @(x)soft_dct2(x,tau,minval,maxval,ones(size(W)),nopad);
-%prox_handle = @(x)bound_range(bin_2d(x,2),minval,maxval,nopad);
+%prox_handle = @(x)bound_range(bin_2d(x,4),minval,maxval,nopad);
 nopad = @(x)x;
 
-%prox_handle = @(x)bound_range(crop(x),minval,maxval,pad)
+%prox_handle = @(x)bound_range((x),minval,maxval,nopad)
 w1 = max(window(@hanning,size(pad(psfd),1)),.1);
 w2 = max(window(@hanning,size(pad(psfd),2)),.1);
 W_real = w1*w2';
@@ -260,10 +265,10 @@ W_fourier = fftshift(w1*w2');
 deweight = @(x)x./W_real.*(W_real>1e-4);
 %prox_handle = @(x)soft_fourier_weighting(x,W_fourier,tau,0,maxval);
 %prox_handle = @(x)soft_wavelet_2d(W_real.*x,wavelev,wavetype,tau,minval,maxval,deweight)
-pct_nz = .9;
-prox_handle = @(x)adaptive_soft_wvlt_2d((x),wavelev,wavetype,pct_nz,minval,maxval,nopad);
+pct_nz = .3;
+prox_handle = @(x)adaptive_soft_wvlt_2d(crop(x),wavelev,wavetype,pct_nz,minval,maxval,pad);
 
-%prox_handle = @(x)tv_2d(bin_2d(x,3),tau,niters,minval,maxval,nopad);
+%prox_handle = @(x)tv_2d(bin_2d(x,2),tau,niters,minval,maxval,nopad);
 %prox_handle = @(x)tv_2d((x),tau,niters,minval,maxval,nopad);
 %prox_handle = @(x)tv_2d(x.*pmat.w,tau,niters,minval,maxval,deweight);
 amt = .001;
@@ -373,7 +378,8 @@ figure(1),clf
 [C,S] = wavedec2(xhat,wavelev,wavetype);
 C_soft = soft(C,tau_debias);
 zvec = C_soft==0;
-options.maxIter = 3000;
-options.convTol = 1e3;
-debias_prox_handle = @(x)wavezero(x,wavelev,wavetype,zvec,minval,maxval,nopad);
+options.maxIter = 2000;
+options.convTol = 1e-3;
+options.stepsize = 650000;
+debias_prox_handle = @(x)wavezero(x,wavelev,wavetype,zvec,0,max(max(xhat))*1.1,nopad);
 [xhat_debias, funvals_debias] = proxMin(GradErrHandle,debias_prox_handle,xhat,obj_r,options);
