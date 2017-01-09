@@ -35,13 +35,14 @@ im_base = im_name(1:dots-1);
 time_stamp = datestr(now,'yyyymmdd_HHMMSS');
 out_base = 'Y:\Diffusers''nstuff\Processing_results';
 out_dir = [out_base,'\',time_stamp,'_',im_base];
-mkdir(out_dir)
+
 res_dir = out_dir;
 raw_dir = out_dir;
 bin = double(imread(im_to_move));
 %%
 diffuser_2d_deconv_v2
 %%
+mkdir(out_dir)
 movefile(im_to_move,raw_dir)
 
 

@@ -2,8 +2,25 @@
 ds = 8;
 colors = 'mono';
 psf_in = imread('\\WALLER-PHANTOM\PhantomData\Grace\2d\psf_close_v2grace_bw.png');
+enforce_obj_support = 1;
 
-h_in = imresize(double(psf_in),1/ds,'box');
+object_close = 1;
+if object_close
+    mag = 1.03;
+    tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
+    width = size(psf_in,2);
+    height = size(psf_in,1);
+    hwarp = imwarp(psf_in,tform,'cubic');
+    ulx = size(hwarp,2)/2-width/2;
+    uly = size(hwarp,1)/2-height/2;
+    psf_warp = imcrop(hwarp,[ulx,uly,width-1,height-1]);
+else
+    psf_warp = psf_in;
+end
+
+h_in = imresize(double(psf_warp),1/ds,'box');
+    
+
 
 switch colors
     case('mono')
@@ -58,17 +75,23 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .001;
+tau = .005;
 niters = 8;
 minval = 0;
 maxval = inf;
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
-prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
+if ~enforce_obj_support
+    prox_handle = @(x)tv_2d(x,tau,niters,minval,maxval,nopad);
+    %prox_handle = @(x)bound_range(x,minval,maxval,nopad);
+else
+    prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
+    %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
+end
 h1 = figure(1),clf
 options.fighandle = h1;
 options.stepsize = .0002;
-options.convTol = 10;
+options.convTol = .05;
 %options.xsize = [256,256];
 options.maxIter = 2000;
 options.residTol = 50;
