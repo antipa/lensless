@@ -1,4 +1,4 @@
-input_folder = 'C:\Users\nick\Documents\camera_out';
+input_folder = 'Y:\Diffusers''nstuff\2d_images_to_process';
 
 %Scan input_folder for an image
 im_found = 0;
@@ -44,7 +44,8 @@ diffuser_2d_deconv_v2
 %%
 mkdir(out_dir)
 movefile(im_to_move,raw_dir)
-
+%%
+xhat = gather(xhat);
 
 save([res_dir,'\',time_stamp,'_',im_base,'_processed.mat'],'xhat','options');
 imwrite(uint8((max(xhat,0)/max(xhat(:))).^(1/2)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);
