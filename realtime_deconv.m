@@ -39,6 +39,10 @@ out_dir = [out_base,'\',time_stamp,'_',im_base];
 res_dir = out_dir;
 raw_dir = out_dir;
 bin = double(imread(im_to_move));
+figure(2),clf
+imagesc(bin)
+axis image
+colormap gray
 %%
 diffuser_2d_deconv_v2
 %%
