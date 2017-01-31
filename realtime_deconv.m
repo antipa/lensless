@@ -38,9 +38,11 @@ out_dir = [out_base,'\',time_stamp,'_',im_base];
 
 res_dir = out_dir;
 raw_dir = out_dir;
+
 bin = (imread(im_to_move));
 b_dem =  demosaic(bin,'bggr');
 bin = mean(double(b_dem),3);
+
 figure(2),clf
 imagesc(bin)
 axis image
