@@ -38,14 +38,20 @@ out_dir = [out_base,'\',time_stamp,'_',im_base];
 
 res_dir = out_dir;
 raw_dir = out_dir;
-bin = double(imread(im_to_move));
+bin = (imread(im_to_move));
+b_dem =  demosaic(bin,'bggr');
+bin = mean(double(b_dem),3);
+figure(2),clf
+imagesc(bin)
+axis image
+colormap gray
 %%
 diffuser_2d_deconv_v2
 %%
 mkdir(out_dir)
 movefile(im_to_move,raw_dir)
 %%
-xhat = gather(xhat);
+xhat_save = crop(gather(xhat));
 
 save([res_dir,'\',time_stamp,'_',im_base,'_processed.mat'],'xhat','options');
-imwrite(uint8((max(xhat,0)/max(xhat(:))).^(1/2)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);
+imwrite(uint8((max(xhat_save,0)/max(xhat_save(:))).^(1/2)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);

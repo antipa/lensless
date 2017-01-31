@@ -1,7 +1,10 @@
 %Load impulse response stack, h
-ds = 4;
+ds = 2;
 colors = 'mono';
-psf_in = imread('\\WALLER-PHANTOM\PhantomData\Grace\2d\psf_close_v2grace_bw.png');
+psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+%psf_in = imread('Y:\Grace\2d\psf_med.tif');
+psf_demosaic = demosaic(psf_in,'bggr');
+psf_in = mean(double(psf_demosaic),3);
 enforce_obj_support = 0;
 
 try   %Figure out if there's a usable GPU
@@ -11,9 +14,10 @@ catch
     use_gpu = 0;
 end
 
-object_close = 1;
+object_close = 0;
 if object_close
-    mag = .994;
+    mag = 1.00;
+    %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
     width = size(psf_in,2);
     height = size(psf_in,1);
@@ -47,7 +51,7 @@ switch colors
     case('blue')
         h = h_in(:,:,3);
 end
-h = h-96;
+h = h-100;
 h = h/norm(h,'fro');
 
 
@@ -82,7 +86,7 @@ switch lower(meas_type)
         bin = double(imread('C:\Users\herbtipa\Documents\MATLAB\robin_close.png'));
         b = imresize(bin,1/4,'box');
     case 'pre_loaded'
-        b = imresize(bin,1/ds,'box')-96;
+        b = imresize(bin,1/ds,'box')-100;
 end
 
 % Define gradient handle
@@ -91,7 +95,7 @@ GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 % Prox handle
 tau = .001;
 niters = 8;
-minval = -500;
+minval = 0;
 maxval = inf;
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
@@ -102,31 +106,37 @@ else
     prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
     %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
 end
-h1 = figure(1),clf
+h1 = figure(1)
+clf
+drawnow
 options.fighandle = h1;
 if ds == 8
     options.stepsize = .0002;
 elseif ds == 4
-    options.stepsize = .00006;
+    options.stepsize = .000078*.9;
 elseif ds == 2
     options.stepsize = .000014;
 end
-options.convTol = .05;
+maxeig = (max(max(abs(fft2(pad(h))))))^2;
+options.stepsize = .85*2/maxeig;
+options.convTol = .005;
 %options.xsize = [256,256];
-options.maxIter = 10000;
+options.maxIter =600;
 options.residTol = 50;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 100;   %display image this often
+options.disp_fig_interval = 5;   %display image this often
 options.xsize = size(h);
 nocrop = @(x)x;
 
-options.disp_gamma = 1/2.2;
-options.disp_crop = @(x)crop(max(abs(x)/max(x(:)),0)).^options.disp_gamma;
+options.disp_gamma = 1/1.5;
+cm = round(.1*size(pad(h)));
+cmx = round(.9*size(pad(h)));
+options.disp_crop = @(x)(max(abs(x(cm(1):cmx(1),cm(2):cmx(2)))/max(x(:)),0)).^options.disp_gamma;
 options.known_input = 0;
 options.force_real = 1;
 options.color_map = 'gray';
-init_style = 'xhat';
+init_style = 'zero';
 
 switch lower(init_style)
     case('zero')     
