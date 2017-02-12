@@ -1,11 +1,16 @@
 %Load impulse response stack, h
-ds = 2;
+ds = 1;
 colors = 'mono';
-psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+switch lower(camera_type)
+    case('pco')
+        psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
+    case('flea3');
+        psf_in = imread('Y:\Diffusers''nstuff\Flea_2d\flea_psf.tif');
+end
 %psf_in = imread('Y:\Grace\2d\psf_med.tif');
-psf_demosaic = demosaic(psf_in,'bggr');
-psf_in = mean(double(psf_demosaic),3);
-enforce_obj_support = 0;
+psf_demosaic = demosaic(psf_in,'rggb');
+psf_in = mean(double(psf_demosaic(:,:,2)),3);
+enforce_obj_support = 1;
 
 try   %Figure out if there's a usable GPU
     gpuDevice;
@@ -14,9 +19,10 @@ catch
     use_gpu = 0;
 end
 
-object_close = 0;
+object_close = 1;
 if object_close
-    mag = 1.00;
+    %mag = .985;
+    mag = 1.00522
     %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
     width = size(psf_in,2);
@@ -86,7 +92,12 @@ switch lower(meas_type)
         bin = double(imread('C:\Users\herbtipa\Documents\MATLAB\robin_close.png'));
         b = imresize(bin,1/4,'box');
     case 'pre_loaded'
-        b = imresize(bin,1/ds,'box')-100;
+        switch lower(camera_type)
+            case('pco')
+                b = imresize(bin,1/ds,'box')-100;
+            case('flea3')
+                b = imresize(bin,1/ds,'box');
+        end
 end
 
 % Define gradient handle
@@ -94,14 +105,14 @@ GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
 tau = .001;
-niters = 8;
+niters = 1;
 minval = 0;
-maxval = inf;
+maxval = Inf
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
 if ~enforce_obj_support
     prox_handle = @(x)tv_2d(x,tau,niters,minval,maxval,nopad);
-    %prox_handle = @(x)bound_range(soft(x,.01),minval,maxval,nopad);
+    %prox_handle = @(x)bound_range(x,minval,maxval,nopad);
 else
     prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
     %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
@@ -118,25 +129,25 @@ elseif ds == 2
     options.stepsize = .000014;
 end
 maxeig = (max(max(abs(fft2(pad(h))))))^2;
-options.stepsize = .85*2/maxeig;
-options.convTol = .005;
+options.stepsize = .8*2/maxeig;
+options.convTol = .5;
 %options.xsize = [256,256];
-options.maxIter =600;
+options.maxIter =1200;
 options.residTol = 50;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 5;   %display image this often
+options.disp_fig_interval = 10;   %display image this often
 options.xsize = size(h);
 nocrop = @(x)x;
 
 options.disp_gamma = 1/1.5;
-cm = round(.1*size(pad(h)));
-cmx = round(.9*size(pad(h)));
+cm = round(.3*size(pad(h)));
+cmx = round(.7*size(pad(h)));
 options.disp_crop = @(x)(max(abs(x(cm(1):cmx(1),cm(2):cmx(2)))/max(x(:)),0)).^options.disp_gamma;
 options.known_input = 0;
 options.force_real = 1;
 options.color_map = 'gray';
-init_style = 'zero';
+init_style = 'wiener';
 
 switch lower(init_style)
     case('zero')     
@@ -155,4 +166,4 @@ if use_gpu
     b = gpuArray(b);
     xinit = gpuArray(xinit);
 end
-[xhat, ~] = proxMin(GradErrHandle,prox_handle,xinit,b,options);
+[xhat, f2] = proxMin(GradErrHandle,prox_handle,xinit,b,options);

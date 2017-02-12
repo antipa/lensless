@@ -1,5 +1,5 @@
 input_folder = 'Y:\Diffusers''nstuff\2d_images_to_process';
-camera_type = 'flea3';
+
 %Scan input_folder for an image
 im_found = 0;
 k = 0;
@@ -42,7 +42,7 @@ raw_dir = out_dir;
 bin = (imread(im_to_move));
 b_dem =  demosaic(bin,'rggb');
 %bin = mean(double(b_dem),3);
-bin = mean(double(b_dem(:,:,2)),3);
+bin = mean(double(b_dem(:,:,2)));
 
 figure(2),clf
 imagesc(bin)
