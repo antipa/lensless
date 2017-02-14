@@ -98,4 +98,4 @@ mkdir(out_dir)
 movefile(im_to_move,raw_dir)
 options.fighandle = [];
 save([res_dir,'\',time_stamp,'_',im_base,'_processed.mat'],'xhat_save');
-imwrite(uint8((max(xhat_save,0)/max(xhat_save(:))).^(1/1.6)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);
+imwrite(uint8((max(xhat_save,0)/max(xhat_save(:))).^(1/1.2)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);

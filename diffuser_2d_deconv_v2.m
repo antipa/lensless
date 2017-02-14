@@ -40,7 +40,7 @@ if size(bin,1)~=size(psf_in,1);
 end
 
 if object_close
-    mag = .985;
+    mag = .99;
     %mag = 1.001;
     %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
@@ -109,8 +109,8 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .005;
-niters = 1;
+tau = .006;
+niters = 8;
 minval = 0;
 maxval = Inf;
 nopad = @(x)x;
@@ -137,7 +137,7 @@ maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
 options.convTol = .00005;
 %options.xsize = [256,256];
-options.maxIter =800;
+options.maxIter =600;
 options.residTol = 5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
