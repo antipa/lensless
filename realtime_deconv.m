@@ -1,5 +1,6 @@
 input_folder = 'Y:\Diffusers''nstuff\2d_images_to_process';
-camera_type = 'flea3';
+camera_type = 'pco';
+colors = 'green';
 %Scan input_folder for an image
 im_found = 0;
 k = 0;
@@ -9,15 +10,15 @@ while ~im_found
     for n = 3:length(indir)
         fname = [input_folder,'\',indir(n).name];
         try 
-            %im_data = imread(fname);   %Image data
+            im_data = imread(fname);   %Image data
             im_to_move = fname;    %Path to image before moving
             im_name = indir(n).name;  %Filename
             im_found = 1;   %Escape if an image is found.
         catch
             k = k+1;
-            fprintf('non image file found. Deleting.')
+            fprintf('non image file found. Deleting.\n')
             files_to_delete{k} = fname;
-            im_found = 0;
+
         end
     end
     
@@ -34,15 +35,31 @@ im_base = im_name(1:dots-1);
 % Get system time
 time_stamp = datestr(now,'yyyymmdd_HHMMSS');
 out_base = 'Y:\Diffusers''nstuff\Processing_results';
-out_dir = [out_base,'\',time_stamp,'_',im_base];
+out_dir = [out_base,'\',time_stamp,'_',im_base,'_',colors];
 
 res_dir = out_dir;
 raw_dir = out_dir;
 
 bin = (imread(im_to_move));
-b_dem =  demosaic(bin,'rggb');
+switch lower(camera_type)
+    case('pco')
+        b_dem =  demosaic(bin,'rggb');
+        switch lower(colors)
+            case('mono')
+                bin = mean(double(b_dem),3);
+            case('red')
+                bin = double(b_dem(:,:,1));
+            case('green')
+                bin = double(b_dem(:,:,2));
+            case('blue')
+                bin = double(b_dem(:,:,3));
+        end
+    case('flea3')
+        bin = double(bin);
+end
+        
 %bin = mean(double(b_dem),3);
-bin = mean(double(b_dem(:,:,2)),3);
+
 
 figure(2),clf
 imagesc(bin)

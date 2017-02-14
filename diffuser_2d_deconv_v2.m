@@ -1,16 +1,29 @@
 %Load impulse response stack, h
-ds = 1;
-colors = 'mono';
+ds = 2;
+
 switch lower(camera_type)
     case('pco')
+        %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
         psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
-    case('flea3');
+        psf_demosaic = demosaic(psf_in,'rggb');
+        switch colors
+            case('mono')
+                psf_in = mean(psf_demosaic,3);
+            case('all')
+            case('red')
+                psf_in = psf_demosaic(:,:,1);
+            case('green')
+                psf_in = psf_demosaic(:,:,2);
+            case('blue')
+                psf_in = psf_demosaic(:,:,3);
+        end
+        psf_in = mean(double(psf_demosaic(:,:,2)),3);
+    case('flea3')
         psf_in = imread('Y:\Diffusers''nstuff\Flea_2d\flea_psf.tif');
 end
 %psf_in = imread('Y:\Grace\2d\psf_med.tif');
-psf_demosaic = demosaic(psf_in,'rggb');
-psf_in = mean(double(psf_demosaic(:,:,2)),3);
-enforce_obj_support = 1;
+
+enforce_obj_support = 0;
 
 try   %Figure out if there's a usable GPU
     gpuDevice;
@@ -20,9 +33,15 @@ catch
 end
 
 object_close = 1;
+
+if size(bin,1)~=size(psf_in,1);
+   p = floor(abs(size(bin)-size(psf_in))/2);
+   psf_in = psf_in(p(1)+1:end-p(1),p(2)+1:end-p(2));
+end
+
 if object_close
     %mag = .985;
-    mag = 1.00522
+    mag = 1.001;
     %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
     width = size(psf_in,2);
@@ -43,24 +62,14 @@ else
 end
 
 h_in = imresize(double(psf_warp),1/ds,'box');
-    
 
 
-switch colors
-    case('mono')
-        h = mean(h_in,3);
-    case('all')
-    case('red')
-        h = h_in(:,:,1);
-    case('green')
-        h = h_in(:,:,2);
-    case('blue')
-        h = h_in(:,:,3);
-end
-h = h-100;
+
+
+
+
+
 h = h/norm(h,'fro');
-
-
 
 %%
 %define problem size
@@ -72,6 +81,7 @@ pad = @(x)padarray(x,[size(h,1)/2,size(h,2)/2],0,'both');
 cc = (size(h,2)/2+1):(3*size(h,2)/2);
 rc = (size(h,1)/2+1):(3*size(h,1)/2);
 crop = @(x)x(rc,cc);
+
 
 H = fft2(pad(h));
 H_conj = conj(H);
@@ -96,7 +106,9 @@ switch lower(meas_type)
             case('pco')
                 b = imresize(bin,1/ds,'box')-100;
             case('flea3')
+
                 b = imresize(bin,1/ds,'box');
+               
         end
 end
 
@@ -104,10 +116,10 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .001;
+tau = .0001;
 niters = 1;
 minval = 0;
-maxval = Inf
+maxval = Inf;
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
 if ~enforce_obj_support
@@ -117,7 +129,7 @@ else
     prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
     %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
 end
-h1 = figure(1)
+h1 = figure(1);
 clf
 drawnow
 options.fighandle = h1;
@@ -130,24 +142,24 @@ elseif ds == 2
 end
 maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
-options.convTol = .5;
+options.convTol = .00005;
 %options.xsize = [256,256];
-options.maxIter =1200;
-options.residTol = 50;
+options.maxIter =500;
+options.residTol = 5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 10;   %display image this often
+options.disp_fig_interval = 20;   %display image this often
 options.xsize = size(h);
 nocrop = @(x)x;
 
 options.disp_gamma = 1/1.5;
-cm = round(.3*size(pad(h)));
-cmx = round(.7*size(pad(h)));
+cm = round(0*size(pad(h))+1);
+cmx = round(1*size(pad(h)));
 options.disp_crop = @(x)(max(abs(x(cm(1):cmx(1),cm(2):cmx(2)))/max(x(:)),0)).^options.disp_gamma;
 options.known_input = 0;
 options.force_real = 1;
 options.color_map = 'gray';
-init_style = 'wiener';
+init_style = 'zero';
 
 switch lower(init_style)
     case('zero')     
@@ -157,7 +169,7 @@ switch lower(init_style)
         xinit = xhat;
         %[xhat, ~] = proxMin(GradErrHandle,prox_handle,xhat,b,options);
     case('wiener')
-        xinit = deconvwnr(pad(b-min(b(:))),pad(h-min(min(h))),1);
+        xinit = deconvwnr(pad(b-min(b(:))),pad(h-min(min(h))),1000);
         
 end
 if use_gpu
