@@ -4,8 +4,8 @@ ds = 2;
 switch lower(camera_type)
     case('pco')
         %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
-        psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
-        psf_demosaic = demosaic(psf_in,'rggb');
+        psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+        psf_demosaic = double(demosaic(psf_in,'rggb'))-100;
         switch colors
             case('mono')
                 psf_in = mean(psf_demosaic,3);
@@ -17,7 +17,7 @@ switch lower(camera_type)
             case('blue')
                 psf_in = psf_demosaic(:,:,3);
         end
-        psf_in = mean(double(psf_demosaic(:,:,2)),3);
+
     case('flea3')
         psf_in = imread('Y:\Diffusers''nstuff\Flea_2d\flea_psf.tif');
 end
@@ -40,8 +40,8 @@ if size(bin,1)~=size(psf_in,1);
 end
 
 if object_close
-    %mag = .985;
-    mag = 1.001;
+    mag = .985;
+    %mag = 1.001;
     %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
     width = size(psf_in,2);
@@ -62,14 +62,7 @@ else
 end
 
 h_in = imresize(double(psf_warp),1/ds,'box');
-
-
-
-
-
-
-
-h = h/norm(h,'fro');
+h = h_in/norm(h_in,'fro');
 
 %%
 %define problem size
@@ -116,7 +109,7 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .0001;
+tau = .005;
 niters = 1;
 minval = 0;
 maxval = Inf;
@@ -144,7 +137,7 @@ maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
 options.convTol = .00005;
 %options.xsize = [256,256];
-options.maxIter =500;
+options.maxIter =800;
 options.residTol = 5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;

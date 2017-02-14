@@ -1,6 +1,6 @@
 input_folder = 'Y:\Diffusers''nstuff\2d_images_to_process';
 camera_type = 'pco';
-colors = 'green';
+process_color = 'rgb';
 %Scan input_folder for an image
 im_found = 0;
 k = 0;
@@ -13,7 +13,7 @@ while ~im_found
             im_data = imread(fname);   %Image data
             im_to_move = fname;    %Path to image before moving
             im_name = indir(n).name;  %Filename
-            im_found = 1;   %Escape if an image is found.
+            im_found = 1;   %Escape if an image is founmd.
         catch
             k = k+1;
             fprintf('non image file found. Deleting.\n')
@@ -35,7 +35,7 @@ im_base = im_name(1:dots-1);
 % Get system time
 time_stamp = datestr(now,'yyyymmdd_HHMMSS');
 out_base = 'Y:\Diffusers''nstuff\Processing_results';
-out_dir = [out_base,'\',time_stamp,'_',im_base,'_',colors];
+out_dir = [out_base,'\',time_stamp,'_',im_base,'_',process_color];
 
 res_dir = out_dir;
 raw_dir = out_dir;
@@ -44,34 +44,58 @@ bin = (imread(im_to_move));
 switch lower(camera_type)
     case('pco')
         b_dem =  demosaic(bin,'rggb');
-        switch lower(colors)
+        switch lower(process_color)
             case('mono')
-                bin = mean(double(b_dem),3);
+                bstack = mean(double(b_dem),3);
             case('red')
-                bin = double(b_dem(:,:,1));
+                bstack = double(b_dem(:,:,1));
             case('green')
-                bin = double(b_dem(:,:,2));
+                bstack = double(b_dem(:,:,2));
             case('blue')
-                bin = double(b_dem(:,:,3));
+                bstack = double(b_dem(:,:,3));
+            case('rgb')
+                bstack = double(b_dem);
         end
     case('flea3')
-        bin = double(bin);
+        bstack = double(bin);
 end
         
 %bin = mean(double(b_dem),3);
 
 
-figure(2),clf
-imagesc(bin)
-axis image
-colormap gray
+% figure(2),clf
+% imagesc(bin)
+% axis image
+% colormap gray
 %%
-diffuser_2d_deconv_v2
-%%
+%xhat_save = zeros(2*size(bstack,1),2*size(bstack,2),size(bstack,3));
+for n = 1:size(bstack,3)
+    if size(bstack,3)>1
+        if n == 1
+            colors = 'red';            
+        elseif n == 2
+            colors = 'green';
+        elseif n == 3
+            colors = 'blue';
+        end
+    else
+        colors = process_color;
+    end
+           
+        
+    bin = bstack(:,:,n);
+    diffuser_2d_deconv_v2
+    if n == 1
+        xhat_save = (gather(xhat));
+    else
+        xhat_save = cat(3,xhat_save,gather(xhat));
+    end
+end
+
+
+
 mkdir(out_dir)
 movefile(im_to_move,raw_dir)
-%%
-xhat_save = (gather(xhat));
 options.fighandle = [];
 save([res_dir,'\',time_stamp,'_',im_base,'_processed.mat'],'xhat_save');
 imwrite(uint8((max(xhat_save,0)/max(xhat_save(:))).^(1/1.6)*255),[res_dir,'\',time_stamp,'_',im_base,'_processed.png']);
