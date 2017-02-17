@@ -1,5 +1,5 @@
 %Load impulse response stack, h
-ds = 2;
+ds = 4;
 
 switch lower(camera_type)
     case('pco')
@@ -40,7 +40,7 @@ if size(bin,1)~=size(psf_in,1);
 end
 
 if object_close
-    mag = .99;
+    mag = .98;
     %mag = 1.001;
     %mag = 1.05;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
@@ -109,7 +109,7 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .006;
+tau = .005;
 niters = 8;
 minval = 0;
 maxval = Inf;
@@ -137,7 +137,7 @@ maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
 options.convTol = .00005;
 %options.xsize = [256,256];
-options.maxIter =600;
+options.maxIter =700;
 options.residTol = 5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
@@ -148,7 +148,7 @@ nocrop = @(x)x;
 options.disp_gamma = 1/1.5;
 cm = round(0*size(pad(h))+1);
 cmx = round(1*size(pad(h)));
-options.disp_crop = @(x)(max(abs(x(cm(1):cmx(1),cm(2):cmx(2)))/max(x(:)),0)).^options.disp_gamma;
+options.disp_crop = @(x)max(crop(x)/max(x(:)),0).^options.disp_gamma;
 options.known_input = 0;
 options.force_real = 1;
 options.color_map = 'gray';
@@ -162,7 +162,7 @@ switch lower(init_style)
         xinit = xhat;
         %[xhat, ~] = proxMin(GradErrHandle,prox_handle,xhat,b,options);
     case('wiener')
-        xinit = deconvwnr(pad(b-min(b(:))),pad(h-min(min(h))),1000);
+        xinit = deconvwnr(pad(gather(b)),pad(gather(h)),10);
         
 end
 if use_gpu
