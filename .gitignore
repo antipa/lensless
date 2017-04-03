@@ -1,0 +1,10 @@
+
+*.mat
+
+cs294_figs.m
+
+*.orig
+
+super_res_point_convex.m
+
+soft_fourier_weighting.m
