@@ -4,7 +4,8 @@ ds = 4;
 switch lower(camera_type)
     case('pco')
         %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
-        psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+        %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+        psf_in = imread('Y:\Grace\2d\psf_close_v2grace_bw.png');
         psf_demosaic = double(demosaic(psf_in,'rggb'))-100;
         switch colors
             case('mono')
@@ -33,16 +34,17 @@ catch
 end
 
 object_close = 1;
-
-if size(bin,1)~=size(psf_in,1);
-   p = floor(abs(size(bin)-size(psf_in))/2);
-   psf_in = psf_in(p(1)+1:end-p(1),p(2)+1:end-p(2));
-end
+% 
+% if size(bin,1)~=size(psf_in,1)
+%    p = floor(abs(size(bin)-size(psf_in))/2);
+%    psf_in = psf_in(p(1)+1:end-p(1),p(2)+1:end-p(2));
+% end
 
 if object_close
-    mag = .98;
-    %mag = 1.001;
-    %mag = 1.05;
+    %mag = .9744;
+    mag = .99;
+    %mag = 1.005;
+    %mag = .98;%1.01;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
     width = size(psf_in,2);
     height = size(psf_in,1);
@@ -90,7 +92,7 @@ switch lower(meas_type)
         obj = zeros(size(h));
         obj(250,320,10) = 1;
         obj(250,400,20) = 1;
-        b = A3d(obj);
+        b = A2d(obj);
     case 'measured'
         bin = double(imread('C:\Users\herbtipa\Documents\MATLAB\robin_close.png'));
         b = imresize(bin,1/4,'box');
@@ -109,14 +111,15 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .005;
-niters = 8;
+tau = .003;
+niters = 50;
 minval = 0;
 maxval = Inf;
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
 if ~enforce_obj_support
     prox_handle = @(x)tv_2d(x,tau,niters,minval,maxval,nopad);
+    %prox_handle = @(x)bm3d_wrapper(x,.1000000);
     %prox_handle = @(x)bound_range(x,minval,maxval,nopad);
 else
     prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
@@ -135,20 +138,21 @@ elseif ds == 2
 end
 maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
-options.convTol = .00005;
+options.convTol = 15e-5;
 %options.xsize = [256,256];
-options.maxIter =700;
+options.maxIter = 700;
 options.residTol = 5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 20;   %display image this often
+options.disp_fig_interval = 50;   %display image this often
 options.xsize = size(h);
 nocrop = @(x)x;
 
 options.disp_gamma = 1/1.5;
-cm = round(0*size(pad(h))+1);
-cmx = round(1*size(pad(h)));
+cm = round(.35*size(pad(h))+1);
+cmx = round(.65*size(pad(h)));
 options.disp_crop = @(x)max(crop(x)/max(x(:)),0).^options.disp_gamma;
+%options.disp_crop = @(x)max((x)/max(x(:)),0).^options.disp_gamma;
 options.known_input = 0;
 options.force_real = 1;
 options.color_map = 'gray';

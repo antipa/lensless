@@ -3,7 +3,8 @@ ds = 4;
 
 switch lower(camera_type)
     case('pco')
-        psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+        %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
+        psf_in = imread('Y:\Grace\2d\psf_close_v2grace_bw.png');
         psf_demosaic = double(demosaic(psf_in,'rggb'))-100;
         switch colors
             case('mono')
@@ -17,6 +18,8 @@ switch lower(camera_type)
                 psf_in = psf_demosaic(:,:,3);
         end
     case('flea3')
+        psf_in = imread('Y:\Diffusers''nstuff\Flea_2d\flea_psf.tif');
+        psf_in = psf_in(176+1:end-176,240+1:end-240);
 end
 %psf_in = imread('Y:\Grace\2d\psf_med.tif');
 
@@ -29,7 +32,7 @@ catch
     use_gpu = 0;
 end
 pass_count = 0;
-magvec = .96:.01:1;
+magvec = .97:.01:1.01
 f = cell(1,length(magvec));
 for mag = magvec
     pass_count = pass_count+1;
@@ -126,7 +129,7 @@ for mag = magvec
     options.stepsize = .8*2/maxeig;
     options.convTol = .005;
     %options.xsize = [256,256];
-    options.maxIter =20;
+    options.maxIter =100;
     options.residTol = 50;
     options.momentum = 'nesterov';
     options.disp_figs = 1;
