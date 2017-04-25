@@ -43,7 +43,11 @@ raw_dir = out_dir;
 bin = (imread(im_to_move));
 switch lower(camera_type)
     case('pco')
-        b_dem =  demosaic(bin,'rggb');
+        if numel(size(bin))==2
+            b_dem =  demosaic(bin,'rggb');
+        elseif numel(size(bin))==3
+            b_dem = bin;
+        end
         switch lower(process_color)
             case('mono')
                 bstack = mean(double(b_dem),3);

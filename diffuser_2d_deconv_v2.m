@@ -1,12 +1,16 @@
 %Load impulse response stack, h
-ds = 4;
+ds = 2;
 
 switch lower(camera_type)
     case('pco')
         %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png')-100;
         %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
-        psf_in = imread('Y:\Grace\2d\psf_close_v2grace_bw.png');
-        psf_demosaic = double(demosaic(psf_in,'rggb'))-100;
+       % psf_in = imread('Y:\Grace\2d\psf_close_v2grace_bw.png');
+        %psf_in = imread('Y:\Diffusers''nstuff\colorPCO_collimated_calibration_far\pinhole_far_green_00001.png');
+        %psf_demosaic = double(demosaic(psf_in,'rggb'));
+       psf_in = load('Y:\Diffusers''nstuff\colorPCO_collimated_calibration_far\pinhole_far_green_coherent.mat');
+       psf_demosaic = repmat(psf_in.imave,[1 1 3]);
+      
         switch colors
             case('mono')
                 psf_in = mean(psf_demosaic,3);
@@ -42,7 +46,8 @@ object_close = 1;
 
 if object_close
     %mag = .9744;
-    mag = .99;
+    %mag = 1.02;
+    mag = 1.005;
     %mag = 1.005;
     %mag = .98;%1.01;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
@@ -62,10 +67,18 @@ if object_close
 else
     psf_warp = psf_in;
 end
-
+%%
 h_in = imresize(double(psf_warp),1/ds,'box');
+strel_size = 41;
+bg = imfilter(imclose(imopen(h_in,strel('disk',strel_size)),...
+    strel('disk',strel_size)),...
+    fspecial('gaussian',15,5),'symmetric');
+bg = 96;
+h_in = h_in-bg;
+%h_in(h_in<150)=0;
+imagesc(h_in<0)
+%%
 h = h_in/norm(h_in,'fro');
-
 %%
 %define problem size
 NX = size(h,2);
@@ -99,7 +112,10 @@ switch lower(meas_type)
     case 'pre_loaded'
         switch lower(camera_type)
             case('pco')
-                b = imresize(bin,1/ds,'box')-100;
+               % b = imresize(medfilt2(bin,[2,2]),1/ds,'box')-96;
+                b = imresize(bin,1/ds,'box');
+                %b = medfilt2(b,[3,3]);
+                %b = b/max(b(:));
             case('flea3')
 
                 b = imresize(bin,1/ds,'box');
@@ -111,18 +127,21 @@ end
 GradErrHandle = @(x) linear_gradient(x,A2d,Aadj_2d,b);
 
 % Prox handle
-tau = .003;
-niters = 50;
+tau = .001;
+niters = 100;
 minval = 0;
 maxval = Inf;
 nopad = @(x)x;
 %prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
 if ~enforce_obj_support
-    prox_handle = @(x)tv_2d(x,tau,niters,minval,maxval,nopad);
-    %prox_handle = @(x)bm3d_wrapper(x,.1000000);
-    %prox_handle = @(x)bound_range(x,minval,maxval,nopad);
+    %prox_handle = @(x)tv_2d(x,tau,niters,minval,maxval,nopad);
+    %prox_handle = @(x)tv_2d_fista_wrapper(x,tau,niters,minval,maxval,nopad,use_gpu);
+   % prox_handle = @(x)bm3d_wrapper(gather(x),.05000000,nopad);
+    prox_handle = @(x)bound_range(x,minval,maxval,nopad);
 else
-    prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
+   % prox_handle = @(x)bm3d_wrapper(gather(TV2DFista(crop(x),tau,0,1)),.03000000,pad);
+    prox_handle = @(x)tv_2d_fista_wrapper(crop(x),tau,niters,minval,maxval,pad,use_gpu);
+   % prox_handle = @(x)tv_2d(crop(x),tau,niters,minval,maxval,pad);
     %prox_handle = @(x)bound_range(crop(x),minval,maxval,pad);
 end
 h1 = figure(1);
@@ -138,13 +157,13 @@ elseif ds == 2
 end
 maxeig = (max(max(abs(fft2(pad(h))))))^2;
 options.stepsize = .8*2/maxeig;
-options.convTol = 15e-5;
+options.convTol = 15e-10;
 %options.xsize = [256,256];
-options.maxIter = 700;
-options.residTol = 5;
+options.maxIter = 1000;
+options.residTol = 5e-5;
 options.momentum = 'nesterov';
 options.disp_figs = 1;
-options.disp_fig_interval = 50;   %display image this often
+options.disp_fig_interval = 10;   %display image this often
 options.xsize = size(h);
 nocrop = @(x)x;
 

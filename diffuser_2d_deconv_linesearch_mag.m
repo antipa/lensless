@@ -5,7 +5,9 @@ switch lower(camera_type)
     case('pco')
         %psf_in = imread('Y:\Diffusers''nstuff\Color_pco_2d_data\darpa_calibration.png');
         psf_in = imread('Y:\Grace\2d\psf_close_v2grace_bw.png');
-        psf_demosaic = double(demosaic(psf_in,'rggb'))-100;
+        psf_demosaic = double(demosaic(psf_in,'rggb'));
+        %psf_in = load('Y:\Diffusers''nstuff\colorPCO_collimated_calibration_far\pinhole_far_green_coherent.mat');
+        %psf_demosaic = repmat(psf_in.imave,[1 1 3]);
         switch colors
             case('mono')
                 psf_in = mean(psf_demosaic,3);
@@ -32,7 +34,7 @@ catch
     use_gpu = 0;
 end
 pass_count = 0;
-magvec = .97:.01:1.01
+magvec = .97:.001:1
 f = cell(1,length(magvec));
 for mag = magvec
     pass_count = pass_count+1;
@@ -58,7 +60,7 @@ for mag = magvec
         psf_warp = psf_in;
     end
     
-    h_in = imresize(double(psf_warp),1/ds,'box');
+    h_in = imresize(double(psf_warp)-100,1/ds,'box');
 
     h = h_in/norm(h_in,'fro');
     

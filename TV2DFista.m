@@ -47,6 +47,7 @@ function [X_den,iter,fun_all]=TV2DFista(Xobs,lambda,l,u,pars)
 
 % Assigning parameres according to pars and/or default values
 flag=exist('pars','var');
+
 if (flag&&isfield(pars,'MAXITER'))
     MAXITER=pars.MAXITER;
 else
@@ -57,14 +58,27 @@ if (flag&&isfield(pars,'epsilon'))
 else
     epsilon=1e-4;
 end
+if (flag&&isfield(pars,'gpu'))
+    use_gpu = pars.gpu;
+else
+    use_gpu = 0;
+end
 
 project = @(x)min(max(x,l),u);
 Ltv = @(P1,P2)cat(1,P1(1,:),diff(P1,1,1),-P1(end,:)) + cat(2,P2(:,1),diff(P2,1,2),-P2(:,end));
 [m,n]=size(Xobs);
-R1=zeros(m-1,n);
-R2=zeros(m,n-1);
-P1=zeros(m-1,n);
-P2=zeros(m,n-1);
+if ~use_gpu
+    R1=zeros(m-1,n);
+    R2=zeros(m,n-1);
+    P1=zeros(m-1,n);
+    P2=zeros(m,n-1);
+elseif use_gpu
+    R1=gpuArray(zeros(m-1,n));
+    R2=gpuArray(zeros(m,n-1));
+    P1=gpuArray(zeros(m-1,n));
+    P2=gpuArray(zeros(m,n-1));
+end
+    
 tkp1=1;
 count=0;
 i=0;
@@ -116,10 +130,10 @@ while((i<MAXITER)&&(count<5))
         count=0;
     end
     
-    C=Xobs-lambda*Ltv(P1,P2);
-    PC=project(C);
-    fval=-norm(C-PC,'fro')^2+norm(C,'fro')^2;
-    fun_all(i) = fval;
+    %C=Xobs-lambda*Ltv(P1,P2);
+    %PC=project(C);
+    %fval=-norm(C-PC,'fro')^2+norm(C,'fro')^2;
+    %fun_all(i) = fval;
 
 end
 fun_all = fun_all(1:i);
