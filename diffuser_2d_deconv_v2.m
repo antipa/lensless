@@ -47,7 +47,7 @@ object_close = 1;
 if object_close
     %mag = .9744;
     %mag = 1.02;
-    mag = 1.005;
+    mag = 1.02;
     %mag = 1.005;
     %mag = .98;%1.01;
     tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);

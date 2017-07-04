@@ -2,28 +2,82 @@
 %psfin = load('/Volumes/PhantomData/Diffusers''nstuff/colorPCO_collimated_calibration_far/pinhole_far_green_coherent.mat');
 
 %psf = psfin.imave;
-psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_psf.png'));
-ds = 1;
-if ds ~= 1
-    psfd = imresize(double(psf(:,:,1)),ds,'box');
+ds = 4;
+demos = 0;
+random_erasure = .01;   %If enabled, randomly delete pixels before recon
+if demos
+    psf = demosaic(imread('/Users/nick.antipa/Documents/pinhole_far_green_00013.png'),'rggb');
+    psf_in = psf(:,:,2)-100;
 else
-    psfd = psf;
+    psf = imread('/Users/nick.antipa/Documents/pinhole_far_green_00013.png');
+    psf_in = double(psf(2:2:end,1:2:end))/2 + double(psf(1:2:end,2:2:end))/2-100;
+    ds = ds/2;
 end
+%%
+color = 3;
+
+
+object_close = 1;
+% 
+% if size(bin,1)~=size(psf_in,1)
+%    p = floor(abs(size(bin)-size(psf_in))/2);
+%    psf_in = psf_in(p(1)+1:end-p(1),p(2)+1:end-p(2));
+% end
+
+if object_close
+    %mag = .9744;
+    %mag = 1.02;
+    mag = 1.04;
+    %mag = 1.005;
+    %mag = .98;%1.01;
+    tform = affine2d([mag 0 0; 0 mag 0; 0 0 1]);
+    width = size(psf_in,2);
+    height = size(psf_in,1);
+    hwarp = imwarp(psf_in,tform,'cubic');
+    ulx = size(hwarp,2)/2-width/2;
+    uly = size(hwarp,1)/2-height/2;
+    if mag > 1
+        psf_warp = imcrop(hwarp,[ulx,uly,width-1,height-1]);
+    elseif mag < 1
+        pad_size = size(psf_in)-size(hwarp);
+        
+        psf_warp = padarray(hwarp,floor(pad_size/2),'pre');
+        psf_warp = padarray(psf_warp,ceil(pad_size/2),'post');
+    end
+else
+    psf_warp = psf_in;
+end
+
+if ds ~= 1
+    psf_ = imresize(double(psf),ds,'box');
+else
+    psf_in = psf;
+end
+psfd = imresize(double(psf_warp),1/ds,'box');
+
+
 h = psfd/norm(psfd(:),2);
 Nx = size(h,2);
 Ny = size(h,1);
-
+imagesc(h);
 %%
-%imin = imread('cameraman.tif');
-imin = imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_shrey1.png');
-if size(imin) ~= size(psfd)
-    im = (double(imresize(imin,2*[Ny,Nx])));
+imin = imread('cameraman.tif');
+%imin = imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_shrey1.png');
+%imin = imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_hand1.png');
+
+if size(imin,1) ~= size(psfd,1)
+    im = (double(imresize(imin,2*[Ny,Nx],'box')));
 else
     im = double(imin)/255;
 end
 h1 = figure(1),clf;
 
 %define crop and pad operators to handle 2D fft convolution
+if random_erasure
+    erasure_window = full(double(sprand(Ny,Nx,random_erasure)>0));
+else
+    erasure_window = ones(Ny,Nx);
+end
 pad = @(x)padarray(x,[size(h,1)/2,size(h,2)/2],0,'both');
 cc = (size(h,2)/2+1):(3*size(h,2)/2);
 rc = (size(h,1)/2+1):(3*size(h,1)/2);
@@ -33,19 +87,40 @@ H = fft2(ifftshift(pad(h)));
 H_conj = conj(H);
 
 % Define forward and adjoints that would be used in gradient descent
-A = @(x)crop(ifftshift(real(ifft2(H.*fft2(ifftshift(x))))));
-At = @(b)real(ifftshift(ifft2(H_conj.*fft2(ifftshift(pad(b))))));
+A = @(x)erasure_window.*crop(ifftshift(real(ifft2(H.*fft2(ifftshift(x))))));
+At = @(b)real(ifftshift(ifft2(H_conj.*fft2(ifftshift(pad(erasure_window.*b))))));
 
 
 %y = A(im);
 %yin = imread('/Volumes/PhantomData/Diffusers''nstuff/Processing_results/20170419_152324_AVG_Video_rgb/AVG_Video.png');
 %yin = demosaic(yin,'bggr');
-yin = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_shrey1.png'));
-if ds ~= 1
-    y = imresize(double(yin(:,:,2)),ds,'box');
+%yin = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_shrey1.png'));
+%yin = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_hand1.png'));
+%%
+if demos
+    yinb = demosaic(imread('/Users/nick.antipa/Documents/diffuser_cam_results/grace_dog_close_scale_102.png'),'rggb');
+    yin = double(yinb(:,:,color))-100;
 else
-    y = double(yin)/255;
+    yinb = imread('/Users/nick.antipa/Documents/diffuser_cam_results/grace_dog_close_scale_102.png');
+    yinred = double(yinb(1:2:end,1:2:end))-100;
+    yingreen = double(yinb(2:2:end,1:2:end))/2 + double(yinb(1:2:end,2:2:end))/2-100;
+    yinblue = double(yinb(2:2:end,2:2:end))-100;
+    if color == 1
+        yin = yinred;
+    elseif color == 2
+        yin = yingreen;
+    elseif color ==3
+        yin = yinblue;
+    end
 end
+y = imresize(yin,1/ds,'box');
+
+y = erasure_window.*y/(2^16);
+ 
+%if size(y)~=size(h)
+ %   y = imresize(y,[Ny,Nx],'box');
+%end
+imagesc(y), axis image
 
 %%
 
@@ -85,7 +160,7 @@ imagesc(abs(HtH));
 mu1 = 0.020972;
 mu2 = 6.815744;
 mu3 = 1.363149;
-tau = .001;
+tau = .005*random_erasure;
 
 % mu1 = 1e-1;
 % mu2 = 1;
@@ -96,14 +171,14 @@ taudec = tauinc;
 muinc = 10;
 
 I(1,1) = 1;
-Smult = 1./(mu1*HtH + mu2*LtL+mu3);  %This is the frequency space division fo S update
+Smult = 1./(mu1*HtH + mu2*LtL + mu3);  %This is the frequency space division fo S update
 if find(isinf(Smult))
     error('Dividing by zero!')
 end
 imagesc(abs(Smult))
 colorbar
 % Compute V denominator
-CtC = pad(ones(size(im)));
+CtC = pad(erasure_window);
 Vmult = 1./(CtC + mu1);
 
 
@@ -121,7 +196,7 @@ alpha3kp = alpha3k;
 Cty = pad(y);
 tk = 1;
 tv_iso = 1;
-%%
+
 n = 0;
 niter = 500;
 while n<niter
@@ -134,7 +209,7 @@ while n<niter
         cat(2,uk_2,zeros(size(uk_2,1),1)).^2);
         magt = soft(mag,tau/mu2);
         mag(mag==0) = eps;
-        mmult = magt./mag;
+        mmult = magt./mag; 
         mmult(mag==0) = 0;
         ukp_1 = uk_1.*mmult(1:end-1,:);
         ukp_2 = uk_2.*mmult(:,1:end-1);
@@ -180,7 +255,7 @@ while n<niter
         imagesc(skp);
         axis image
         
-        caxis([0 prctile(skp(:),99.9)])
+        caxis([prctile(skp(:),.001) prctile(skp(:),99.99)])
        % axis(ds/.1*[128.5166  356.6414  107.6861  300.1663]);
         colorbar
         colormap gray
