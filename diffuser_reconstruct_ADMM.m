@@ -4,7 +4,7 @@
 %psf = psfin.imave;
 ds = 4;
 demos = 0;
-random_erasure = .05;   %If enabled, randomly delete pixels before recon
+random_erasure = .1;   %If enabled, randomly delete pixels before recon
 
 if demos
     psf = demosaic(imread('/Users/nick.antipa/Documents/pinhole_far_green_00013.png'),'rggb');
@@ -174,7 +174,7 @@ for color = color_vec
     mu1 = 0.020972;
     mu2 = 6.815744;
     mu3 = 1.363149;
-    tau = .008*random_erasure;
+    tau = .0003;
 
     % mu1 = 1e-1;
     % mu2 = 1;
@@ -212,7 +212,7 @@ for color = color_vec
     tv_iso = 1;
 
     n = 0;
-    niter = 500;
+    niter = 200;
     while n<niter
         n = n+1;
         [Lsk1,Lsk2] = L(sk);
