@@ -1,4 +1,4 @@
-function write_3d_as_avi(arr,fname,cmap_in,frame_rate)
+function write_3d_as_mp4(arr,fname,cmap_in,frame_rate,ds)
 % write_3d_as_avi(arr,fname,cmap_in)
 % inputs:
 % arr : 3d array to be written. Dim 3 is always assumed to be time.
@@ -8,24 +8,25 @@ function write_3d_as_avi(arr,fname,cmap_in,frame_rate)
 % cmape_in : string specifying the colormap. Any MATLAB colormap should
 % work.
 % frame_rate (optional) : video framerate
-%
+% ds : downsampling. Use < 1 to shrink
 % Outputs: 
 % Saves video file, as well as a png of the color bar. The min and max for
 % the colorbar are printed to the command prompt.
 dots = strfind(fname,'.');
 if ~isempty(dots)
-    if strcmpi(fname(dots(end):end),'.avi')
+    if strcmpi(fname(dots(end):end),'.mp4')
         fpath = ['~/',fname];
         fname = fname(1:dots(end)-1);
     else
-        error('File extension is not avi')
+        error('File extension is not avi or mp4')
         return
     end
 else
-    fpath = ['~/',fname,'.avi'];
+    fpath = ['~/',fname,'.mp4'];
 end
 
-vout = VideoWriter(fpath);
+
+vout = VideoWriter(fpath,'MPEG-4');
 vout.Quality = 100;
 vout.FrameRate = frame_rate;
 try
@@ -43,8 +44,9 @@ current_frame = struct('cdata',[],'colormap',[]);
 arr_min = min(arr(:));
 c_range = max(arr(:))-arr_min;
 arr_sc = (arr-arr_min)/c_range;
+
 for n = 1:size(arr,3)
-    im_rgb = ind2rgb(floor(1+size(cmap,1)*arr_sc(:,:,n)),cmap);
+    im_rgb = ind2rgb(floor(1+size(cmap,1)*imresize(arr_sc(:,:,n),ds,'box')),cmap);
     current_frame.cdata = uint8(255*im_rgb);
     writeVideo(vout,current_frame);
 end

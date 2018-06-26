@@ -1,12 +1,12 @@
 % Load data
-function diffuser_reconstruct_ADMM_spatially_varying
+
 psf_in = load('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/calibration/low_rank/PCA_v1_10pc.mat');
 meas_in = load('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/calibration/low_rank/rawData_flower_PCA100_v1.mat');
 %%
-autotune = 1;
+autotune = 0;
 save_metrics = 1;
 ds = 4;
-N_comps = 10;
+N_comps = 1;
 pc = double(imresize(psf_in.pc(:,:,1:N_comps),1/ds,'box'));
 weights = double(imresize(psf_in.weights(:,:,1:N_comps),1/ds,'box'));
  %pc_n = norm(pc(:,:,1),'fro');
@@ -17,20 +17,20 @@ Nx = Nx/2;
 Ny = Ny/2;
 s_orig = imresize(meas_in.gndtruth,1/ds,'box');
 %b = imresize(meas_in.btruth,1/ds,'box');
-%%
+
 
 mu_inc = 1.3;
 mu_dec = 1.3;
 resid_tol = 4;
 % Tuning params
 sc = 1;
-mu1 = .0013*sc;
-mu2 = 2.09*sc;
-mu3 = .2147*sc;
-mu4 = .17*sc;
-mu5 = .13*sc;
-mu6 = 3.4*sc;
-tau = 5*sc;
+mu1 = .004;
+mu2 = 2.7;
+mu3 = 6.5;
+mu4 = .5;
+mu5 = .8;
+mu6 = 12.6;
+tau = 5e1;
 
 
 
@@ -39,14 +39,14 @@ Lambda = @(x)x.*weights;   %x must be 3D stack of ims
 LambdaT = @(x)sum(x.*weights,3);
 lamb_weight = sum(weights.^2,3);
 Lambda_mult = 1./(mu2 + mu1*lamb_weight);
-
+%%
 % PSF-spectrum
 H_freq = fft2(pc);
 H_conj_freq = conj(H_freq);
 HtH_freq = 1./(mu4*abs(H_freq.*H_conj_freq) + mu1);
 
-H = @(x)real(ifftshift(ifftshift(ifft2(H_freq.*fft2(x)),1),2));
-H_adj = @(x)real(ifftshift(ifftshift(ifft2(H_conj_freq.*fft2(x)),1),2));
+H = @(x)real(ifftshift2(ifft2(H_freq.*fft2(x))));
+H_adj = @(x)real(ifftshift2(ifft2(H_conj_freq.*fft2(x))));
 %Crop 
 pad = @(x)padarray(x,[Ny/2,Nx/2],0,'both');
 cc = (Nx/2+1):(3*Nx/2);
@@ -58,7 +58,7 @@ b = crop(sum(H(Lambda(s_orig)),3));  %Create fake data
 Ctb = pad(b);
 
 Ibart = @(x)repmat(x,[1 1 N_comps]);
-
+Ibar = @(x)sum(x,3);
 % Setup TV operators for s and u updates
 Ltv = @(P1,P2)cat(1,P1(1,:),diff(P1,1,1),-P1(end,:)) + cat(2,P2(:,1),diff(P2,1,2),-P2(:,end));
 
@@ -110,12 +110,13 @@ for k = 1:niter
     
     %v
     v_km1 = v;
-    v = (1./mu5)*ItI_inv(mu4*H(w)+alpha4 + Ibart(mu5*y - alpha5),N_comps,mu4/mu5);
+    v = ItI_inv(mu4*H(w)+alpha4 + Ibart(mu5*y - alpha5),N_comps,mu4/mu5)/mu5;
     
     %w
-    wnum = ifftshift(ifftshift(mu1*Lambda(x) + alpha1 + H_adj(mu4*v - alpha4),1),2);
+    wnum = (mu1*Lambda(x) + alpha1 + H_adj(mu4*v - alpha4));
     w_km1 = w;
-    w = real(ifftshift(ifftshift(ifft2(HtH_freq.*fft2(wnum)),1),2));
+   %HtH_inv = real(ifftshift2(ifft2(HtH_freq.*fft2(ifftshift2(HtH_in)))));
+    w = real(ifftshift2(ifft2(HtH_freq.*fft2(ifftshift2(wnum)))));
     
     % p
     p_km1 = p;
@@ -166,7 +167,7 @@ for k = 1:niter
         '\n'])
     end
     %npix = 4*Ny*Nx;
-    data_fidelity = norm(crop(sum(H(Lambda(s)),3))-b);
+    data_fidelity = norm(crop(sum(H(Lambda(s)),3))-b)^2;
     TV_penalty = sum(grad_mag(:));
     
     x_resid = norm(vec(r_xw));
@@ -228,7 +229,7 @@ for k = 1:niter
     if save_metrics
         if k == 1
             date_of_run = datestr(now,'yyyymmdd_HHMMSS');
-            fname = [date_of_run,'_log.txt'];
+            fname = ['/Users/nick.antipa/Documents/developer/logs/admm_psf_decomp',date_of_run,'_log.txt'];
             metric_file = fopen(fname,'w');
             fprintf(metric_file,['Total_cost\tdata_fidelity\tTV_norm\t ',...
                 '||Lambda(x)-w||\t||mu1*LambdaT(w-w_km1)||\t',...
@@ -253,17 +254,7 @@ for k = 1:niter
     
 end
 
-end
 
-function im_out = ItI_inv(im_stack,N_comps,mu)
-% Compute the inverse of ItI
-    im_out = zeros(size(im_stack));
-    w2 = 1/(mu*(mu+N_comps));
-    w1 = 1/mu;
-    Z = w2*sum(im_stack,3);
-    for n = 1:N_comps
-        im_out(:,:,n) = w1*im_stack(:,:,n);
-    end
-    im_out = im_out - Z;
-end
+
+
 

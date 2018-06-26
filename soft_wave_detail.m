@@ -1,3 +1,4 @@
+
 function c_out = soft_wave_detail(o,c,s,n,tau)
 %DETCOEF2 Extract 2-D detail coefficients.
 %   D = DETCOEF2(O,C,S,N) extracts from the wavelet
