@@ -1,4 +1,4 @@
-N = 809;
+N = 101;
 A = generate_2D_MURA(N);
 up = 3;
 pxdown = 3;

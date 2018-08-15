@@ -3,16 +3,16 @@ count = 0;
 psnr_list = [];
 st = 4;
 xorig = double(imread('cameraman.tif'));
-ds = 1/2;
+ds = 1;
 x = imresize(xorig,1/ds,'box')/255;
 [Ny, Nx] = size(x);
 Nmax = 64;
 im_list = zeros(Ny,Nx,Nmax/st);
 
-for n = 1:st:64
+for n = 32
     pcount = 0;
     count = count+1;
-    for Np = 25
+    for Np = 500
         pcount = pcount + 1;
         rng(1);
         xorig = double(imread('cameraman.tif'));
@@ -69,7 +69,7 @@ for n = 1:st:64
         psf_gt = imresize(psf_gt,1/upsamp/2,'box');
         imagesc(psf)
         kernel2 = fspecial('gaussian',[21,21],blur*1/ds);
-
+    
         x_gt = conv2(x,psf_gt/sum(psf_gt(:)),'same');
 
         %% Convolve and crop
@@ -87,7 +87,7 @@ for n = 1:st:64
         QE = .8;
         gain = .46;
         gnoise = 5;
-        b_noise = round(b_noise*QE/gain)+gnoise*randn(size(b));
+        b_noise = round(b_noise*QE/gain+gnoise*randn(size(b)));
         imagesc(b_noise)
 
 

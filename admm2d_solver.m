@@ -1,4 +1,4 @@
-function [xhat, f] = admm2d_solver(y,x_init,h,sett_file)
+function [xhat, f] = admm2d_solver(y,h,sett_file)
 % Solves xhat using ADMM from measurement b
 % Inputs: y - array measurement
 % x_init: initialization for variable. If empty, use zeros.
@@ -8,14 +8,16 @@ function [xhat, f] = admm2d_solver(y,x_init,h,sett_file)
 h1 = figure(1);
 clf
 tic
-%h = h/norm(h,'fro');
+
+h = h/norm(h,'fro');
 if isempty(sett_file)
     admm2d_settings
+else
+    run(sett_file);
 end
+tau = cast(tau,'like',y);
 [Ny, Nx] = size(h);
-if isempty(x_init)
-    x_init = zeros(2*Ny,2*Nx);
-end
+
 pad = @(x)padarray(x,[floor(Ny/2), floor(Nx/2)],'both');
 %cc = (Nx/2+1):(3*Nx/2);
 %rc = (Ny/2+1):(3*Ny/2);
@@ -26,17 +28,17 @@ H_conj = conj(H);
 
 % Adjoint of TV finite difference
 % Precompute spectrum of L'L
-d = zeros(Ny,Nx);
-d(floor(Ny/2),floor(Nx/2)) = 1;
+
 % Uncropped forward
-Hfor = @(x)real(fftshift(ifft2(H.*fft2(ifftshift(x)))));
-Hadj = @(x)real(fftshift(ifft2(H_conj.*fft2(ifftshift(x)))));
+Hfor = @(x)real(ifft2(H.*fft2(x)));
+Hadj = @(x)real(ifft2(H_conj.*fft2(x)));
 % Initialize variables
-sk = zeros(Ny*2,Nx*2);
-alpha1k = zeros(2*Ny,2*Nx);
-alpha3k = zeros(2*Ny,2*Nx);
-alpha3kp = alpha3k;
 Cty = pad(y);
+sk = 0*Cty;
+alpha1k = sk;
+alpha3k = sk;
+alpha3kp = sk;
+
 tv_iso = 1;
 
 % TV stuff
@@ -45,15 +47,17 @@ Ltv = @(P1,P2)cat(1,P1(1,:),diff(P1,1,1),-P1(end,:)) + cat(2,P2(:,1),diff(P2,1,2
 % Forward finite difference (returns two images!) [P1, P2] = L(x)
 L = @(D)deal(-diff(D,1,1),-diff(D,1,2));
 
-lapl = zeros(2*Ny,2*Nx);
+lapl = sk;
 lapl(1) = 4;
 lapl(1,2) = -1;
 lapl(2,1) = -1;
 lapl(1,end) = -1;
 lapl(end,1) = -1;
 LtL = abs(fft2(lapl));
-alpha2k_1 = zeros(2*Ny-1,2*Nx);
-alpha2k_2 = zeros(2*Ny,2*Nx-1);
+%alpha2k_1 = zeros(2*Ny-1,2*Nx);
+%alpha2k_2 = zeros(2*Ny,2*Nx-1);
+alpha2k_1 = sk(1:end-1,:);
+alpha2k_2 = sk(:,1:end-1);
 
 
 
@@ -62,8 +66,8 @@ DCT_adj = @(Q)idct2(Q);
 DCT_for = @(D)dct2(D);
 
 %LtL = ones(2*Ny,2*Nx);%abs(fft2(dct2(pad(d))));
-alpha4k = zeros(2*Ny,2*Nx);
-alpha4kp = alpha4k;
+alpha4k = sk;
+alpha4kp = sk;
 
 %Precompute H'H
 %psfacorr = Hadj(Hfor(pad(d)));
@@ -83,25 +87,25 @@ end
 if find(isinf(Smult))
     error('Dividing by zero!')
 end
-imagesc(abs(Smult))
-colorbar
+
+
 % Compute V denominator
-CtC = pad(ones(Ny,Nx));
+CtC = pad(ones(Ny, Nx,'like',y));
 Vmult = 1./(CtC + mu1);
-Hskp = zeros(size(Vmult));
+Hskp = zeros(2*Ny, 2*Nx, 'like',Vmult);
 
 
 
 n = 0;
 
-dual_resid_s = zeros(1,niter)./0;
-primal_resid_s = zeros(1,niter)./0;
+dual_resid_s = zeros(1,niter,'like',y)./0;
+primal_resid_s = dual_resid_s;
 dual_resid_u = dual_resid_s;
 primal_resid_u = dual_resid_u;
 dual_resid_w = dual_resid_s;
 primal_resid_w = dual_resid_s;
 
-f = primal_resid_u;
+f = dual_resid_s;
 [ukp_1, ukp_2] = L(zeros(2*Ny, 2*Nx));
 Lsk1 = ukp_1;
 Lsk2 = ukp_2;
@@ -137,32 +141,33 @@ while n<niter
                 DCT_adj(mu4*zkp - alpha4k);
     end
     
-    skp = real(ifftshift(ifft2(Smult .* fft2(ifftshift(skp_numerator)))));
+    skp = real(ifft2(Smult .* fft2(skp_numerator)));
     
     %Update dual and parameter for Hs=v constraint
     Hskp = Hfor(skp);
     r_sv = Hskp-vkp;
-    alpha1k = alpha1k + mu1*r_sv;
     dual_resid_s(n) = mu1*norm(Hsk - Hskp,'fro');
     primal_resid_s(n) = norm(r_sv);
     [mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,primal_resid_s(n),dual_resid_s(n));
+    alpha1k = alpha1k + mu1*r_sv;
     
     % Update dual and parameter for Ls=v
     [Lskp1, Lskp2] = L(skp);
     r_su_1 = Lskp1 - ukp_1;
     r_su_2 = Lskp2 - ukp_2;
-    alpha2k_1 = alpha2k_1 + mu2*r_su_1;
-    alpha2k_2 = alpha2k_2 + mu2*r_su_2;
     dual_resid_u(n) = mu2*sqrt(norm(Lskm1 - Lsk1,'fro')^2+norm(Lskm2 - Lsk2,'fro')^2);
     primal_resid_u(n) = sqrt(norm(r_su_1,'fro')^2 + norm(r_su_2,'fro')^2);
     [mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,primal_resid_u(n),dual_resid_u(n));
+    alpha2k_1 = alpha2k_1 + mu2*r_su_1;
+    alpha2k_2 = alpha2k_2 + mu2*r_su_2;
+    %[mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,primal_resid_u(n),dual_resid_u(n));
     
     % Update nonnegativity dual and parameter (s=w)
     r_sw = skp-wkp;
-    alpha3k = alpha3k + mu3*r_sw;
     dual_resid_w(n) = mu3*norm(sk - skp,'fro');
     primal_resid_w(n) = norm(r_sw,'fro');
     [mu3, mu3_update] = update_param(mu3,resid_tol,mu_inc,mu_dec,primal_resid_w(n),dual_resid_w(n));
+    alpha3k = alpha3k + mu3*r_sw;
     
     if strcmpi(regularizer_type,'dct') || strcmpi(regularizer_type,'both')
         

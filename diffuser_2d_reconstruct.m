@@ -1,4 +1,4 @@
-ds = 1/4;  %Amount to downsample problem. Use 1/integer.
+ds = 1;  %Amount to downsample problem. Use 1/integer.
 useGpu = 0;
 useDouble = 1;
 bin = 0;
@@ -10,8 +10,10 @@ color = 2;
 %psf = double(imread('/Users/nick.antipa/Dropbox/Light fields without lenslets NICK/data/diffuser_flatcam/Box/psf_hdr/psf_box_exp8.tif'));
 %psfin = load('uniform_lenslets_500_2560_2048.mat');
 %psf = psfin.I_resize;
-psfin = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/psf_med.tif'));
-psf = psfin(:,:,color);
+%psfin = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/psf_med.tif'));
+%psf = psfin(:,:,color);
+psf_in = load('/Users/nick.antipa/Downloads/learned_psf_FISTA.mat');
+psf = real(psf_in.psf);
 %clear psfin
 %psf = double(imread('C:\Users\herbtipa\Dropbox\Light fields without lenslets NICK\data\diffuser_flatcam\Baffle\psf_16bit_baffle.tif'));
 %psf = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/diffuser_flatcam/Poster_2016_11_14/psf_green_LED.tif'));

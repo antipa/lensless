@@ -2,7 +2,7 @@
 %psfin = load('/Volumes/PhantomData/Diffusers''nstuff/colorPCO_collimated_calibration_far/pinhole_far_green_coherent.mat');
 
 %psf = psfin.imave;
-ds = 4;
+ds = 8;
 tic
 demos = 0;
 hsc=50;
@@ -11,9 +11,9 @@ camera_type = 'pco';
 erasure_type = 'none' %Choices: random, tile, none
 object_close = 0;   %Magnify PSF to account for object distance changes
 color_correct = 0;
-psf_color_proc = 'rgb';
-mag_vec = .95;  %Adjust 1PSF distance
-color_proc = 'rgb';
+psf_color_proc = 'mono';
+mag_vec = 1;  %Adjust 1PSF distance
+color_proc = 'mono';
 random_erasure = 3/16;   %If enabled, randomly delete pixels before recon. Use a number between 0 and 1 to do erasure, and 0 for full res
 y_tiles = 4;
 x_tiles = 4;
@@ -21,20 +21,20 @@ tile_gap = .5;  %Fraction of individual sensor width to leave as a gap
 % ADMM stuff
 %tau_vec = [8e-4 4e-4 10e-4]/hsc;  %TV params for BSI
 tau_vec = [1e-3 1e-3 5e-3]/.01;  %TV params for PCO
-taumax = 10;
-taumin = 2;
+taumax = .007
+taumin = .007
 
-niter = 500;
+niter = 50;
 tauiter = logspace(log10(taumax),log10(taumin),niter);
 tau2 = 20e-4;  %DCT
 
 
 quantize_error = 1;
 B = 8;
-noise_std = 0/(2^B-1);  %fraction of max, only used when simulating
-mu1 = .09;
-mu2 = 5.9;
-mu3 = 5;
+noise_std = 5/(2^B-1);  %fraction of max, only used when simulating
+mu1 = .5;
+mu2 =  1.1;
+mu3 = 2.7;
 mu4 = .7; %DCT
 
 mu_inc = 1.2;
@@ -45,6 +45,7 @@ if demos
     switch lower(camera_type)
         case('pco')
             psf = demosaic(imread('/Users/nick.antipa/Documents/pinhole_far_green_00013.png'),'bggr');
+            psf = imread(
             psf_in = psf(:,:,2)-100;
         case('ids_bsi')
             psf_in = double(demosaic(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/BSI_color/2p5ft_LED_12bit_raw.png'),'rggb'));
@@ -55,20 +56,45 @@ if demos
 
     end
 else
-    imbias = 100;
+    imbias = 00;
     %psf = imread('/Users/nick.antipa/Documents/pinhole_far_green_00013.png');
     switch lower(camera_type)
         case('pco')
-            psf_in = load('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/pinhole_far_green_coherent.mat');
+            %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/pinhole_far_green_coherent.mat');
             %psf = double(imread('/Volumes/PhantomData/Diffusers''nstuff/Big_DiffuserMicroscope/171201/789_00001.tif'));
-            psf = psf_in.imave;
+            %psf_in = psf_in.imave;
+            %psf_in = load('/Users/nick.antipa/Downloads/learned_psf_FISTA.mat');
+            %psf_in = max(real(psf_in.psf),0)
             %psf_in = load('/Users/nick.antipa/Documents/developer/lensless/poisson_lenslets_best.mat');
             %psf_in = load('/Users/nick.antipa/Documents/developer/lensless/poisson_lenslets_best_sphere_k2000.mat');
             %psf_in = load('./uniform_lenslets_best_moresphere_k300.mat');
             %psf_in = load('/Users/nick.antipa/Documents/developer/lensless/poisson_lenslets_worst_k110e6.mat');
             %psf_in = load('/Users/nick.antipa/Documents/developer/lensless/poisson_lenslets_best_k2600.mat');
+            
             %psf_in = load('./uniform_miniscope_k5k_f36.mat');
             %psf_in = load('/Users/nick.antipa/Documents/developer/lensless/poisson_lenslets_best_k2600.mat');
+            %psf_in = psf_in.IbestF;
+            %psf_in = imread('/Users/nick.antipa/Downloads/RPC_4degree_PSF.png');
+            %psf_in = imresize(double(psf_in),1/2,'box');
+            %[py, px] = size(psf_in);
+            %psf_in = psf_in(1:floor(py/ds/4)*ds*4,1:floor(px/ds/4)*ds*4) - imbias;
+            %%aper = zeros(size(psf_in));
+            %aper(300:end-300,300:end-300) = 1;
+            %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/poisson_f=10_best_TF_sum_601691.mat');
+            %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/poisson_f=10_worst_TF_sum_1894468.mat');
+           % psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/poisson_f=10_best_sidelobes_13p3.mat');
+           %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/poisson_f=10_worst_sidelobes_3p17.mat');
+           %psf_in = load('/Users/nick.antipa/Documents/Diffusers/DiffuserOptimization/Unrolled/learned_initial_50iter_256samp_2000epochs.mat')
+           psf_in = load('/Users/nick.antipa/Documents/Diffusers/DiffuserOptimization/Unrolled/PSF_learned_initial_50iter_256_sampling_2000epochs.mat'); 
+           psf_in = psf_in.PSF_init;
+           %psf_in = load('/Users/nick.antipa/Documents/Diffusers/DiffuserOptimization/Unrolled/PSF_learned_final_50iter_256_sampling_2000epochs.mat');
+           %psf_in = psf_in.PSF_opt;
+           
+           %psf_in = load('/Users/nick.antipa/Documents/Diffusers/DiffuserOptimization/Unrolled/learned_optimized_15iter_256samp_2000epochs.mat');
+           %psf_in = psf_in.PSF_opt;
+            [py, px] = size(psf_in);
+            psf_in = psf_in(1:floor(py/ds/4)*ds*4,1:floor(px/ds/4)*ds*4) - imbias;
+            %psf_in = aper.*psf_in;
             %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/uniform_quantized_H_498e3_correct_f=10.mat');
             %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/uniform_quantized_H_330e3_225lenslets_f=10.mat');
             %psf_in = load('/Users/nick.antipa/Documents/Diffusers/Miniscope/Masks/regular_quantized_H_111e6_225lenslets_f=10.mat');
@@ -89,7 +115,7 @@ else
            %psf = psf_in.Id(115:366,255:506);
             %psf = padarray(psf,[206,206],'both');
             %psf = psf_in.IworstF;
-            psf_in = double(psf(2:2:end,1:2:end))/2 + double(psf(1:2:end,2:2:end))/2-imbias;
+            %psf_in = double(psf(2:2:end,1:2:end))/2 + double(psf(1:2:end,2:2:end))/2-imbias;
             %psf_in = double(psf_in(1:end-1,1:end-1));
             %ds = ds/2;
         case('ids_bsi')
@@ -104,6 +130,7 @@ else
             c_crop = 1:(ds*2*floor(Nx_in/ds/2));
             r_crop = 1:(ds*2*floor(Ny_in/ds/2));
             psf_in = psf_in(r_crop,c_crop,:);
+
             
     end
 end
@@ -161,7 +188,8 @@ for mag_set = mag_vec
         
         
         %h = psfd/norm(psfd(:),2)*2^8;
-        h = psfd/max(psfd(:)); 
+        %h = psfd/max(psfd(:)); 
+        h = psfd/norm(psfd(:));
         Nx = size(h,2);
         Ny = size(h,1);
         if ccount == 1
@@ -173,7 +201,7 @@ for mag_set = mag_vec
         %imin = imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_shrey1.png');
         %imin = imread('/Users/nick.antipa/Documents/Diffusers/Lensless/tapeycam/tape_40cm_hand1.png');
         
-        if size(imin,1) ~= size(psfd,1)
+        if size(imin,1) ~= size(psfd,1) || size(imin,2) ~= size(psfd,2)
             im = (double(imresize(imin,2*[Ny,Nx],'box')));
         else
             im = double(imin)/255;
@@ -241,9 +269,9 @@ for mag_set = mag_vec
             %yinb = double(imread('/Volumes/PhantomData/Diffusers''nstuff/Big_DiffuserMicroscope/171201/ghfh_00011.tif'));
             %yinb = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/BSI_color/nick2_test_no_awb.png'));
             %yinb = double(imread('/Users/nick.antipa/Documents/Diffusers/Lensless/pco_2d_color/lab_scene_ave-raw.png'))-imbias;
-            yinb = double(imread('/Users/nick.antipa/Documents/Diffusers/Diffuser data/emrah_pco_rgb.png'));
-            %yinb = A(im);
-           
+            %yinb = double(imread('/Users/nick.antipa/Documents/Diffusers/Diffuser data/emrah_pco_rgb.png'));
+            yinb = A(im);
+            yinb = conv2(psfd,im,'same');
             if numel(size(yinb)) == 2
                 if demos
                     switch lower(camera_type)
@@ -302,10 +330,10 @@ for mag_set = mag_vec
         end
         y = imresize(yin,[Ny,Nx],'box');
         
-        y = erasure_window.*y/max(yin(:))*255;
-        y = y+randn(size(y))*noise_std;
+        y = erasure_window.*y/max(yin(:));
+        %y = y+randn(size(y))*noise_std;
         if quantize_error
-            y = double(floor(y*2^B))*2^(-B);
+            %y = double(floor(y*2^B))*2^(-B);
         end
         y_out(:,:,ccount) = y;
         %if size(y)~=size(h)
@@ -438,28 +466,30 @@ for mag_set = mag_vec
             %Update dual and parameter for Hs=v constraint
             Hskp = Hfor(skp);
             r_sv = Hskp-vkp;
-            alpha1k = alpha1k + mu1*r_sv;
+            
+            
             %dual_resid_s(n) = mu1*norm(Hfor(sk-skp),'fro');
             dual_resid_s(n) = mu1*norm(Hskp - Hsk,'fro');
             primal_resid_s(n) = norm(r_sv);
             [mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,primal_resid_s(n),dual_resid_s(n));
+            alpha1k = alpha1k + mu1*r_sv;
             
             % Update dual and parameter for Ls=v
             [Lskp1, Lskp2] = L(skp);
             r_su_1 = Lskp1 - ukp_1;
             r_su_2 = Lskp2 - ukp_2;
-            alpha2k_1 = alpha2k_1 + mu2*r_su_1;
-            alpha2k_2 = alpha2k_2 + mu2*r_su_2;
             dual_resid_u(n) = mu2*sqrt(norm(Lsk1 - Lskm1,'fro')^2+norm(Lsk2 - Lskm2,'fro')^2);
             primal_resid_u(n) = sqrt(norm(r_su_1,'fro')^2 + norm(r_su_2,'fro')^2);
             [mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,primal_resid_u(n),dual_resid_u(n));
+            alpha2k_1 = alpha2k_1 + mu2*r_su_1;
+            alpha2k_2 = alpha2k_2 + mu2*r_su_2;
             
             % Update nonnegativity dual and parameter (s=w)
-            r_sw = skp-wkp;
-            alpha3k = alpha3k + mu3*r_sw;
+            r_sw = skp-wkp;            
             dual_resid_w(n) = mu3*norm(sk - skp,'fro');
             primal_resid_w(n) = norm(r_sw,'fro');
             [mu3, mu3_update] = update_param(mu3,resid_tol,mu_inc,mu_dec,primal_resid_w(n),dual_resid_w(n));
+            alpha3k = alpha3k + mu3*r_sw;
             
             if strcmpi(regularizer_type,'dct') || strcmpi(regularizer_type,'both')
                 
@@ -489,7 +519,8 @@ for mag_set = mag_vec
             sk = skp;
             f(n) = norm(crop(Hskp)-y,'fro')^2 + tau*TVnorm(skp);
             if exist('im')
-                sig_to_noise(n) = psnr(crop(skp),crop(im)/max(yinb(:)),255/max(yinb(:)));
+                sig_to_noise(n) = psnr(crop(im),crop(skp)*max(yin(:))/255,255);
+                
             end
             if mod(n,20)==0
                 toc
@@ -502,7 +533,8 @@ for mag_set = mag_vec
                 %fprintf('%.4f\n',norm(Hfor(skp) - vkp,'fro'))
                 %nrm = TVnorm(sk) +
                 %subplot(2,2,1)
-                imagesc(crop(skp));
+                imagesc((skp));
+                title(sprintf('psnr: %.2f',sig_to_noise(n)))
                 axis image
                 colormap gray
                 colorbar
@@ -538,22 +570,24 @@ end
 
 fprintf('total time: %.2f seconds \n',toc(bigT))
 %%
-gamma = .8;
-%white_bal= [1 .7 1 ];
-%white_bal = [1.1 .8 .5];
-white_bal = [1.1 .9 .8];
-im_out = im_out/prctile(im_out(:),99.9);
-switch lower(color_proc)
-    case('rgb')
-        im_out_wb = cat(3,white_bal(1).*im_out(:,:,1),white_bal(2).*im_out(:,:,2),white_bal(3).*im_out(:,:,3));
-    otherwise
-        im_out_wb = im_out;
-end
-im_to_write = uint8(255*max(im_out_wb,0).^(gamma));
-imagesc(im_to_write)
-
+% gamma = 1;
+% %white_bal= [1 .7 1 ];
+% %white_bal = [1.1 .8 .5];
+% white_bal = [1.1 .9 .8];
+% im_out = im_out/prctile(im_out(:),99.9);
+% switch lower(color_proc)
+%     case('rgb')
+%         im_out_wb = cat(3,white_bal(1).*im_out(:,:,1),white_bal(2).*im_out(:,:,2),white_bal(3).*im_out(:,:,3));
+%     otherwise
+%         im_out_wb = im_out;
+% end
+% im_to_write = uint8(255*max(im_out_wb,0).^(gamma));
+% imagesc(im_to_write)
+% 
+% axis image
+% %axis([Nx/2 3*Nx/2 Ny/2 3*Ny/2])
+% im_stack{mag_count} = im_to_write;
+imagesc((sk)), colorbar
 axis image
-%axis([Nx/2 3*Nx/2 Ny/2 3*Ny/2])
-im_stack{mag_count} = im_to_write;
 
 
