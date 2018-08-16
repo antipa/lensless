@@ -84,7 +84,7 @@ switch lower(regularizer_type)
     case('both')
         Smult = 1./(mu1*HtH + mu2*LtL + mu3 + mu4);
 end
-if find(isinf(Smult))
+if find(isinf(gather(Smult)))
     error('Dividing by zero!')
 end
 
@@ -147,7 +147,7 @@ while n<niter
     Hskp = Hfor(skp);
     r_sv = Hskp-vkp;
     dual_resid_s(n) = mu1*norm(Hsk - Hskp,'fro');
-    primal_resid_s(n) = norm(r_sv);
+    primal_resid_s(n) = norm(r_sv,'fro');
     [mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,primal_resid_s(n),dual_resid_s(n));
     alpha1k = alpha1k + mu1*r_sv;
     
