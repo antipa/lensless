@@ -106,7 +106,7 @@ dual_resid_w = dual_resid_s;
 primal_resid_w = dual_resid_s;
 
 f = dual_resid_s;
-[ukp_1, ukp_2] = L(zeros(2*Ny, 2*Nx));
+[ukp_1, ukp_2] = L(zeros(2*Ny, 2*Nx,'like',y));
 Lsk1 = ukp_1;
 Lsk2 = ukp_2;
 %----------------- Main Loop 0----------------------
