@@ -98,14 +98,14 @@ Hskp = zeros(2*Ny, 2*Nx, 'like',Vmult);
 
 n = 0;
 
-dual_resid_s = zeros(1,niter,'like',y)./0;
-primal_resid_s = dual_resid_s;
-dual_resid_u = dual_resid_s;
-primal_resid_u = dual_resid_u;
-dual_resid_w = dual_resid_s;
-primal_resid_w = dual_resid_s;
+f.dual_resid_s = zeros(1,niter,'like',y)./0;
+f.primal_resid_s = f.dual_resid_s;
+f.dual_resid_u = f.dual_resid_s;
+f.primal_resid_u = f.dual_resid_u;
+f.dual_resid_w = f.dual_resid_s;
+f.primal_resid_w = f.dual_resid_s;
 
-f = dual_resid_s;
+f.cost = f.dual_resid_s;
 [ukp_1, ukp_2] = L(zeros(2*Ny, 2*Nx,'like',y));
 Lsk1 = ukp_1;
 Lsk2 = ukp_2;
@@ -146,29 +146,30 @@ while n<niter
     %Update dual and parameter for Hs=v constraint
     Hskp = Hfor(skp);
     r_sv = Hskp-vkp;
-    dual_resid_s(n) = mu1*norm(Hsk - Hskp,'fro');
-    primal_resid_s(n) = norm(r_sv,'fro');
-    [mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,primal_resid_s(n),dual_resid_s(n));
+    f.dual_resid_s(n) = mu1*norm(Hsk - Hskp,'fro');
+    f.primal_resid_s(n) = norm(r_sv,'fro');
+    [mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,f.primal_resid_s(n),f.dual_resid_s(n));
     alpha1k = alpha1k + mu1*r_sv;
+    %[mu1, mu1_update] = update_param(mu1,resid_tol,mu_inc,mu_dec,f.primal_resid_s(n),f.dual_resid_s(n));
     
     % Update dual and parameter for Ls=v
     [Lskp1, Lskp2] = L(skp);
     r_su_1 = Lskp1 - ukp_1;
     r_su_2 = Lskp2 - ukp_2;
-    dual_resid_u(n) = mu2*sqrt(norm(Lskm1 - Lsk1,'fro')^2+norm(Lskm2 - Lsk2,'fro')^2);
-    primal_resid_u(n) = sqrt(norm(r_su_1,'fro')^2 + norm(r_su_2,'fro')^2);
-    [mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,primal_resid_u(n),dual_resid_u(n));
+    f.dual_resid_u(n) = mu2*sqrt(norm(Lskm1 - Lsk1,'fro')^2+norm(Lskm2 - Lsk2,'fro')^2);
+    f.primal_resid_u(n) = sqrt(norm(r_su_1,'fro')^2 + norm(r_su_2,'fro')^2);
+    [mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,f.primal_resid_u(n),f.dual_resid_u(n));
     alpha2k_1 = alpha2k_1 + mu2*r_su_1;
     alpha2k_2 = alpha2k_2 + mu2*r_su_2;
-    %[mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,primal_resid_u(n),dual_resid_u(n));
+    %[mu2, mu2_update] = update_param(mu2,resid_tol,mu_inc,mu_dec,f.primal_resid_u(n),f.dual_resid_u(n));
     
     % Update nonnegativity dual and parameter (s=w)
     r_sw = skp-wkp;
-    dual_resid_w(n) = mu3*norm(sk - skp,'fro');
-    primal_resid_w(n) = norm(r_sw,'fro');
-    [mu3, mu3_update] = update_param(mu3,resid_tol,mu_inc,mu_dec,primal_resid_w(n),dual_resid_w(n));
+    f.dual_resid_w(n) = mu3*norm(sk - skp,'fro');
+    f.primal_resid_w(n) = norm(r_sw,'fro');
+    [mu3, mu3_update] = update_param(mu3,resid_tol,mu_inc,mu_dec,f.primal_resid_w(n),f.dual_resid_w(n));
     alpha3k = alpha3k + mu3*r_sw;
-    
+    %[mu3, mu3_update] = update_param(mu3,resid_tol,mu_inc,mu_dec,f.primal_resid_w(n),f.dual_resid_w(n));
     if strcmpi(regularizer_type,'dct') || strcmpi(regularizer_type,'both')
         
         alpha4k = alpha4k + mu4*(DCT_for(skp) - zkp);
@@ -195,11 +196,11 @@ while n<niter
     %alpha4kp = alpha4kp + beta_kp1*(alpha4kp - alpha4k);
     
     sk = skp;
-    f(n) = norm(crop(Hskp)-y,'fro')^2 + tau*TVnorm(skp);
+    f.cost(n) = norm(crop(Hskp)-y,'fro')^2 + tau*TVnorm(skp);
     if mod(n,disp_interval)==0
         toc
         fprintf('iter: %i \t cost: %.4f \t Primal v: %.4f \t Dual v: %.4f \t Primal u: %.4f \t Dual u: %.4f \t Primal w: %.4f \t Dual w: %.4f \t mu1: %.4f \t mu2: %.4f \t mu3: %.4f \n',...
-            n,f(n),primal_resid_s(n), dual_resid_s(n),primal_resid_u(n), dual_resid_u(n),primal_resid_w(n), dual_resid_w(n),mu1,mu2,mu3)
+            n,f.cost(n),f.primal_resid_s(n), f.dual_resid_s(n),f.primal_resid_u(n), f.dual_resid_u(n),f.primal_resid_w(n), f.dual_resid_w(n),mu1,mu2,mu3)
         
         set(0,'CurrentFigure',h1);
         
