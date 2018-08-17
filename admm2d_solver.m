@@ -11,9 +11,7 @@ clf
 tic
 
 h = h/norm(h,'fro');  %This should cause a merge conflict
-=======
-h = h/norm(h,'fro');  %I am conflicted
->>>>>>> f1c593f591acf15c4c284a5494a3072fcf79cb02
+
 if isempty(sett_file)
     admm2d_settings
 else
