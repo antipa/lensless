@@ -10,7 +10,7 @@ h1 = figure(1);
 clf
 tic
 
-h = h/norm(h,'fro');
+h = h/norm(h,'fro');  %I am conflicted
 if isempty(sett_file)
     admm2d_settings
 else
