@@ -19,11 +19,10 @@ end
 
 
 % If extra arg passed in, overwrite tau
-if ~isempty(varargin)
+if ~isempty(varargin{1})
     tau = varargin{1};
 end
 
-%Cast tau to match input data type
 tau = cast(tau,'like',y);
 
 [Ny, Nx] = size(h);
@@ -208,21 +207,20 @@ while n<niter
     sk = skp;
     f.cost(n) = norm(crop(Hskp)-y,'fro')^2 + tau*TVnorm(skp);
     if mod(n,disp_interval)==0
-       
-        set(0,'CurrentFigure',h1);
-        imagesc(crop(sk));
-        hold on
-        caxis([0 prctile(gather(sk(:)),99.9)])
-        axis image
-        colormap gray
-        hold off
-        drawnow        
-    end
-    
-    if mod(n,loss_interval)==0
         toc
         fprintf('iter: %i \t cost: %.4f \t Primal v: %.4f \t Dual v: %.4f \t Primal u: %.4f \t Dual u: %.4f \t Primal w: %.4f \t Dual w: %.4f \t mu1: %.4f \t mu2: %.4f \t mu3: %.4f \n',...
             n,f.cost(n),f.primal_resid_s(n), f.dual_resid_s(n),f.primal_resid_u(n), f.dual_resid_u(n),f.primal_resid_w(n), f.dual_resid_w(n),mu1,mu2,mu3)
+        
+        set(0,'CurrentFigure',h1);
+        
+        %fprintf('%.4f\t %.4f\t %.4f\t %.4f\t %.4f\t %.4f\n',ea1,ea2a,ea2b,ea3,e_primal,f)
+        %fprintf('%.4f\n',norm(Hfor(skp) - vkp,'fro'))
+        %nrm = TVnorm(sk) +
+        %subplot(2,2,1)
+        imagesc((sk));
+        axis image
+        colormap gray
+        drawnow
         tic
     end
 end

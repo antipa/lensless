@@ -1,6 +1,6 @@
 ds = 4;  %Downsampling
 demos = 1;
-niter = 100;
+niter = 10;
 regularizer_type = 'tv';
 camera_type = 'ids_bsi';
 erasure_type = 'none' %Choices: random, tile, none
@@ -15,9 +15,10 @@ x_tiles = 4;
 tile_gap = .5;  %Fraction of individual sensor width to leave as a gap
 % ADMM stuff
 tau_vec = [8e-4 4e-4 10e-4];  %TV
-tau = 200;
+tau = .01
 tau2 = .5e-7;  %DCT
-disp_interval = 10;
+disp_interval = 50;
+loss_interval = 10;
 
 mu1 = .14;
 mu2 = 3;
