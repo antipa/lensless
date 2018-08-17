@@ -10,7 +10,7 @@ h1 = figure(1);
 clf
 tic
 
-h = h/norm(h,'fro');
+h = h/norm(h,'fro');  %This should cause a merge conflict
 if isempty(sett_file)
     admm2d_settings
 else
